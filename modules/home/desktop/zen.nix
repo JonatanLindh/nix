@@ -61,7 +61,6 @@
           "addon@darkreader.org" = "darkreader";
           "firefox@tampermonkey.net" = "tampermonkey";
           "sponsorBlocker@ajay.app" = "sponsorblock";
-
         };
 
         Preferences = mkLockedAttrs {

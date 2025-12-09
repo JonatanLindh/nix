@@ -18,10 +18,6 @@
       ];
     };
 
-    amdgpu = {
-      initrd.enable = true;
-    };
-
     enableAllFirmware = true;
 
     bluetooth = {

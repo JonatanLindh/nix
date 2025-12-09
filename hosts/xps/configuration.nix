@@ -3,9 +3,18 @@
 
   imports = [
     ./hardware-configuration.nix
+    ./nvidia.nix
     inputs.self.nixosModules.common
     inputs.self.nixosModules.desktop
   ];
+
+  nixpkgs = {
+    overlays = [
+      (pkgs': pkgs: {
+        btop = pkgs.btop.override { cudaSupport = true; };
+      })
+    ];
+  };
 
   boot = {
     kernelPackages = pkgs.linuxPackages_latest;
@@ -29,7 +38,7 @@
 
   nixpkgs.hostPlatform = "x86_64-linux";
 
-  networking.hostName = "xps15";
+  networking.hostName = "xps";
 
   services = {
     thermald.enable = true;

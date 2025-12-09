@@ -1,6 +1,6 @@
 { pkgs, config, ... }:
 {
-  services.xservervideoDrivers = [ "nvidia" ];
+  services.xserver.videoDrivers = [ "nvidia" ];
 
   hardware = {
     graphics.extraPackages = with pkgs; [

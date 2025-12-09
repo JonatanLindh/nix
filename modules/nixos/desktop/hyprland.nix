@@ -5,6 +5,10 @@
   ...
 }:
 {
+  programs.uwsm.waylandCompositors.hyprland.binPath = pkgs.lib.mkForce ''
+    ${inputs.hyprland.packages.${pkgs.system}.hyprland}/bin/start-hyprland
+  '';
+
   programs.hyprland = {
     enable = true;
     withUWSM = true;
