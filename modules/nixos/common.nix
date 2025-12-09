@@ -90,6 +90,9 @@
     geoclue2.enable = true;
 
     tailscale.enable = true;
+    openssh = {
+      enable = true;
+    };
 
     ananicy = {
       enable = true;
@@ -145,4 +148,5 @@
       enable = true;
     };
   };
+
 }
