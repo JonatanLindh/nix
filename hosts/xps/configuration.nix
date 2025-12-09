@@ -8,6 +8,26 @@
     inputs.self.nixosModules.desktop
   ];
 
+  nix.distributedBuilds = true;
+  nix.settings.builders-use-substitutes = true;
+  nix.buildMachines = [
+    {
+      hostName = "desktop";
+      protocol = "ssh-ng";
+      system = "x86_64-linux";
+      sshUser = "jonatan";
+      sshKey = "/home/jonatan/.ssh/id_ed25519";
+      maxJobs = 48;
+      speedFactor = 2;
+      supportedFeatures = [
+        "nixos-test"
+        "benchmark"
+        "big-parallel"
+        "kvm"
+      ];
+    }
+  ];
+
   nixpkgs = {
     overlays = [
       (pkgs': pkgs: {

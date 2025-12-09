@@ -58,6 +58,7 @@
   # Enable networking
   networking = {
     networkmanager.enable = true;
+    interfaces.tailscale0.mtu = 1200;
 
     firewall = {
       enable = true;
