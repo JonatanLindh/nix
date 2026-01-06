@@ -113,6 +113,7 @@
 
   services = {
     udiskie.enable = true;
+    easyeffects.enable = true;
   };
 
   home.stateVersion = "26.05"; # initial home-manager state
