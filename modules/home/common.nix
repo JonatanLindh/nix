@@ -10,10 +10,13 @@
 
     sccache
     rustup
+
     uv
     nil
     nixd
 
+    clang-tools
+    clang
   ];
 
   programs = {

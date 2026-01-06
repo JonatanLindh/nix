@@ -19,6 +19,9 @@
     };
 
     enableAllFirmware = true;
+    firmware = [
+      pkgs.linux-firmware
+    ];
 
     bluetooth = {
       enable = true;

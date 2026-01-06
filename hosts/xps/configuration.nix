@@ -28,14 +28,6 @@
     }
   ];
 
-  nixpkgs = {
-    overlays = [
-      (pkgs': pkgs: {
-        btop = pkgs.btop.override { cudaSupport = true; };
-      })
-    ];
-  };
-
   boot = {
     kernelPackages = pkgs.linuxPackages_latest;
 
@@ -56,7 +48,15 @@
     };
   };
 
-  nixpkgs.hostPlatform = "x86_64-linux";
+  nixpkgs = {
+    hostPlatform = "x86_64-linux";
+
+    overlays = [
+      (pkgs': pkgs: {
+        btop = pkgs.btop.override { cudaSupport = true; };
+      })
+    ];
+  };
 
   networking.hostName = "xps";
 

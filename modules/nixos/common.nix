@@ -16,6 +16,7 @@
         "flakes"
       ];
       trusted-users = [ "@wheel" ];
+      cores = 0;
       max-jobs = 48;
       download-buffer-size = 524288000;
       auto-optimise-store = true;
@@ -105,6 +106,7 @@
   programs.git = {
     enable = true;
     package = pkgs.gitFull;
+    lfs.enable = true;
     config = {
       credential.helper = "libsecret";
     };
@@ -125,6 +127,8 @@
     perf
     tldr
     just
+    usbutils
+    pciutils
 
     # archives
     zip

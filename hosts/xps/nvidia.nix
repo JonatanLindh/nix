@@ -1,4 +1,9 @@
-{ pkgs, config, ... }:
+{
+  pkgs,
+  config,
+  perSystem,
+  ...
+}:
 {
   services.xserver.videoDrivers = [ "nvidia" ];
 
@@ -29,7 +34,9 @@
 
       package = config.boot.kernelPackages.nvidiaPackages.beta;
     };
-
   };
 
+  environment.systemPackages = [
+    perSystem.self.vulkan-hdr-layer
+  ];
 }
