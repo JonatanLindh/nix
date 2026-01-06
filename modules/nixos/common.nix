@@ -115,6 +115,7 @@
   programs.fish.enable = true;
   programs.nix-ld.enable = true;
   programs.dconf.enable = true;
+  programs.localsend.enable = true;
 
   environment.systemPackages = with pkgs; [
     btop
