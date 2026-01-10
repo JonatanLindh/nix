@@ -1,9 +1,5 @@
 { pkgs, inputs, ... }:
 {
-
-  # only available on linux, disabled on macos
-  services.ssh-agent.enable = true;
-
   home.packages = with pkgs; [
     ripgrep
     fastfetch
@@ -117,6 +113,7 @@
   services = {
     udiskie.enable = true;
     easyeffects.enable = true;
+    ssh-agent.enable = true;
   };
 
   home.stateVersion = "26.05"; # initial home-manager state

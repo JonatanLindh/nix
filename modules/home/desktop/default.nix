@@ -1,4 +1,4 @@
-{ pkgs, ... }:
+{ pkgs, perSystem, ... }:
 {
   imports = [
     ./hyprland.nix
@@ -25,7 +25,7 @@
     google-chrome
     vesktop
     gimp3
-    zed-editor
+    perSystem.nixpkgs-zed.zed-editor
 
     # Gaming
     mangohud

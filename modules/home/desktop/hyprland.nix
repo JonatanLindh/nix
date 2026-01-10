@@ -56,16 +56,14 @@
   services.hyprpaper = {
     enable = true;
     settings = {
-      ipc = "on";
       splash = false;
-      splash_offset = 2.0;
-
-      preload = [
-        "/home/jonatan/Pictures/Wallpapers/geometrics-d.jxl"
-      ];
 
       wallpaper = [
-        ", /home/jonatan/Pictures/Wallpapers/geometrics-d.jxl"
+        {
+          monitor = "";
+          path = "/home/jonatan/Pictures/Wallpapers/geometrics-d.jxl";
+          fit_mode = "cover";
+        }
       ];
     };
   };

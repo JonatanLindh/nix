@@ -29,6 +29,8 @@
       url = "github:GitAlias/gitalias";
       flake = false;
     };
+
+    nixpkgs-zed.url = "github:NixOS/nixpkgs/nixos-25.11";
   };
 
   # Load blueprint

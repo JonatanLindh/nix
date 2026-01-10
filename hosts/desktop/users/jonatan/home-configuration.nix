@@ -1,12 +1,11 @@
-{ pkgs, inputs, ... }:
+{ pkgs, flake, ... }:
 {
-
   imports = [
-    inputs.self.homeModules.common
-    inputs.self.homeModules.desktop
+    flake.homeModules.common
+    flake.homeModules.desktop
   ];
 
   home.packages = with pkgs; [
-    blender-hip
+    blender
   ];
 }

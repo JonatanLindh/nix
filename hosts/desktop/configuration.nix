@@ -34,6 +34,10 @@
         btop = pkgs.btop.override { rocmSupport = true; };
       })
     ];
+
+    config = {
+      rocmSupport = true;
+    };
   };
 
   networking.hostName = "desktop";
