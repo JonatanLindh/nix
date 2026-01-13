@@ -8,6 +8,7 @@
     ./wleave.nix
     ./theme.nix
     ./zen.nix
+    ./easyeffects
   ];
 
   home.packages = with pkgs; [

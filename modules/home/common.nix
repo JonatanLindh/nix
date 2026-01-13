@@ -112,7 +112,6 @@
 
   services = {
     udiskie.enable = true;
-    easyeffects.enable = true;
     ssh-agent.enable = true;
   };
 
