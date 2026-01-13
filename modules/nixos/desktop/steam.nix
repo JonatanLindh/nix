@@ -1,3 +1,4 @@
+{ pkgs, ... }:
 {
   programs.steam = {
     enable = true;
@@ -7,8 +8,16 @@
     localNetworkGameTransfers.openFirewall = true; # Open ports in the firewall for Steam Local Network Game Transfers
   };
 
+  environment.systemPackages = [ pkgs.gamescope-wsi ];
   programs.gamescope = {
     enable = true;
-    capSysNice = true;
+    capSysNice = false;
+    args = [
+      "-W 3840"
+      "-H 2160"
+      "-r 160"
+      "--hdr-enabled"
+      "--force-grab-cursor"
+    ];
   };
 }
