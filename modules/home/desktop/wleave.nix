@@ -56,5 +56,3 @@ in
     close-on-lost-focus = true;
   };
 }
-
-
