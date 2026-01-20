@@ -36,6 +36,7 @@
     extraModprobeConfig = "options iwlwifi power_save=1 11n_disable=8 kvm.ignore_msrs=1";
 
     kernelModules = [ "nvidia-uvm" ];
+    kernelParams = [ "snd_intel_dspcfg.dsp_driver=3" ];
 
     # Bootloader
     loader = {

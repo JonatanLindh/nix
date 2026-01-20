@@ -23,22 +23,18 @@
       download-buffer-size = 524288000;
       auto-optimise-store = true;
 
-      substituters = lib.mkOverride 1000 [
-        "https://hetzner-cache.numtide.com"
-        "https://numtide.cachix.org"
-        "https://cuda-maintainers.cachix.org"
+      extra-substituters = [
         "https://hyprland.cachix.org"
+        "https://cuda-maintainers.cachix.org"
+        "https://numtide.cachix.org"
         "https://nix-community.cachix.org"
-        "https://zed-industries.cachix.org"
       ];
 
-      trusted-public-keys = lib.mkOverride 1000 [
-        "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspc6rC48="
-        "numtide.cachix.org-1:2ps1kLBUWjxIneOy1Ik6cQjb41X0iXVXeHigGmycPPE="
-        "cuda-maintainers.cachix.org-1:0dq3bujKpuEPMCX6U4WylrUDZ9JyUG0VpVZa7CNfq5E="
+      extra-trusted-public-keys = [
         "hyprland.cachix.org-1:a7pgxzMz7+chwVL3/pzj6jIBMioiJM7ypFP8PwtkuGc="
+        "cuda-maintainers.cachix.org-1:0dq3bujKpuEPMCX6U4WylrUDZ9JyUG0VpVZa7CNfq5E="
         "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
-        "zed-industries.cachix.org-1:fgVpvtdF+ssrgP1lB6EusuR3uM6bNcncWduKxri3u6Y="
+        "numtide.cachix.org-1:2ps1kLBUWjxIneOy1Ik6cQjb41X0iXVXeHigGmycPPE="
       ];
 
     };
@@ -75,13 +71,6 @@
     alsa.enable = true;
     alsa.support32Bit = true;
     pulse.enable = true;
-    # If you want to use JACK applications, uncomment this
-    # jack.enable = true;
-
-    # use the example session manager (no others are packaged yet so
-    # this is enabled by default, no need to redefine it in your config
-    # for now)
-    #media-session.enable = true;
   };
 
   services = {

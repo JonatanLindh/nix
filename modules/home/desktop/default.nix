@@ -25,7 +25,7 @@
     google-chrome
     vesktop
     gimp3
-    perSystem.nixpkgs-zed.zed-editor
+    zed-editor
 
     # Gaming
     mangohud
