@@ -9,6 +9,7 @@
     ./theme.nix
     ./zen.nix
     ./easyeffects
+    ./mime.nix
   ];
 
   home.packages = with pkgs; [

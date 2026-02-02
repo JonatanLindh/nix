@@ -51,13 +51,17 @@
     fish = {
       enable = true;
       shellAbbrs = {
-        d = "devenv";
         g = "git";
         sw = "nh os switch";
-        mh = "ENABLE_HDR_WSI=1 mpv";
       };
       shellAliases = {
         zed = "zeditor";
+      };
+      functions = {
+        o = {
+          body = "uwsm-app -- xdg-open $argv &>/dev/null &; disown";
+          description = "Open file detached via uwsm";
+        };
       };
     };
 
