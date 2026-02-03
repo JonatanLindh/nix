@@ -108,6 +108,15 @@
   programs.dconf.enable = true;
   programs.localsend.enable = true;
 
+  programs.nh = {
+    enable = true;
+    flake = "/home/jonatan/nix";
+    clean = {
+      enable = true;
+      extraArgs = "--keep-since 7d --keep 5";
+    };
+  };
+
   environment.systemPackages = with pkgs; [
     btop
     fzf
