@@ -13,6 +13,8 @@
 
     clang-tools
     clang
+
+    apptainer
   ];
 
   programs = {
@@ -104,6 +106,8 @@
     direnv = {
       enable = true;
       nix-direnv.enable = true;
+      enableBashIntegration = true;
+      enableFishIntegration = true;
     };
 
     nh = {
@@ -115,6 +119,25 @@
 
     gemini-cli = {
       enable = true;
+    };
+
+    ssh = {
+      enable = true;
+      matchBlocks = {
+        "vera" = {
+          hostname = "vera2.c3se.chalmers.se";
+          user = "lindhjon";
+          identityFile = "~/.ssh/id_ed25519";
+        };
+        "*" = {
+          extraOptions = {
+            WarnWeakCrypto = "no-pq-kex";
+          };
+          setEnv = {
+            TERM = "xterm-256color";
+          };
+        };
+      };
     };
   };
 
