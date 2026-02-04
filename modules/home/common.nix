@@ -121,7 +121,9 @@
           hostname = "vera2.c3se.chalmers.se";
           user = "lindhjon";
           identityFile = "~/.ssh/id_ed25519";
+          forwardAgent = true;
         };
+
         "*" = {
           extraOptions = {
             WarnWeakCrypto = "no-pq-kex";

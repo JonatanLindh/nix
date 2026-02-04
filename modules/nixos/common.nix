@@ -131,6 +131,7 @@
     usbutils
     pciutils
     android-tools
+    eduvpn-client
 
     # archives
     zip

@@ -65,6 +65,8 @@
 
     firewall = {
       enable = true;
+      checkReversePath = "loose";
+
       allowedTCPPorts = [
         3000
         8080
