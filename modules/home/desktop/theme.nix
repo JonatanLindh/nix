@@ -1,11 +1,14 @@
-{ pkgs, ... }:
+{ lib, pkgs, ... }:
 {
   home.pointerCursor = {
-    gtk.enable = true;
-    x11.enable = true;
     package = pkgs.bibata-cursors;
     name = "Bibata-Modern-Classic";
-    size = 15;
+
+    gtk.enable = true;
+    x11.enable = true;
+    hyprcursor.enable = true;
+
+    size = lib.mkDefault 20;
   };
 
   gtk = {
@@ -23,7 +26,7 @@
 
     font = {
       name = "Inter";
-      size = 11;
+      size = 12;
     };
   };
 }
