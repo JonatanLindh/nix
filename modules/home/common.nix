@@ -10,6 +10,7 @@
     uv
     nil
     nixd
+    nixfmt
 
     clang-tools
     clang
