@@ -134,7 +134,17 @@
     extraArgs = [ "--autopilot" ];
   };
 
-  networking.hostName = "desktop";
+  networking = {
+    hostName = "desktop";
+    interfaces = {
+        ens3 = {
+          wakeOnLan.enable = true;
+        };
+      };
+      firewall = {
+        allowedUDPPorts = [ 9 ];
+      };
+  };
 
   system.stateVersion = "25.11"; # initial nixos state
 }
