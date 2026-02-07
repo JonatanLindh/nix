@@ -1,10 +1,10 @@
-{ pkgs, inputs, ... }:
+{ pkgs, flake, ... }:
 {
 
   imports = [
     ./hardware-configuration.nix
-    inputs.self.nixosModules.common
-    inputs.self.nixosModules.desktop
+    flake.nixosModules.common
+    flake.nixosModules.desktop
   ];
 
   nixpkgs = {

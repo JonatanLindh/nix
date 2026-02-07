@@ -1,8 +1,8 @@
-{ inputs, ... }:
+{ flake, ... }:
 {
 
   imports = [
-    inputs.self.homeModules.common
-    inputs.self.homeModules.desktop
+    flake.homeModules.common
+    flake.homeModules.desktop
   ];
 }

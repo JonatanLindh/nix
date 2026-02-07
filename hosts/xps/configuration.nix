@@ -1,11 +1,12 @@
-{ pkgs, inputs, ... }:
+{ pkgs, flake, ... }:
 {
 
   imports = [
     ./hardware-configuration.nix
     ./nvidia.nix
-    inputs.self.nixosModules.common
-    inputs.self.nixosModules.desktop
+    flake.nixosModules.common
+    flake.nixosModules.desktop
+    flake.nixosModules.tlp
   ];
 
   nix.distributedBuilds = false;
@@ -36,7 +37,11 @@
     extraModprobeConfig = "options iwlwifi power_save=1 11n_disable=8 kvm.ignore_msrs=1";
 
     kernelModules = [ "nvidia-uvm" ];
-    kernelParams = [ "snd_intel_dspcfg.dsp_driver=3" ];
+    kernelParams = [
+      "snd_intel_dspcfg.dsp_driver=3"
+      "i915.enable_fbc=1"
+      "i915.enable_guc=3"
+    ];
 
     # Bootloader
     loader = {
@@ -63,7 +68,6 @@
 
   services = {
     thermald.enable = true;
-    power-profiles-daemon.enable = true;
     resolved.enable = true;
     upower.enable = true;
   };
