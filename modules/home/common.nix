@@ -73,6 +73,36 @@
       enable = true;
     };
 
+    helix = {
+      enable = true;
+      settings = {
+        theme = "monokai_pro_spectrum";
+        editor.cursor-shape = {
+          normal = "block";
+          insert = "bar";
+          select = "underline";
+        };
+      };
+      languages.language = [
+        {
+          name = "nix";
+          auto-format = true;
+          formatter.command = "${pkgs.nixfmt}/bin/nixfmt";
+        }
+        {
+          name = "rust";
+          auto-format = true;
+          formatter.command = "${pkgs.rustfmt}/bin/rustfmt";
+        }
+      ];
+      themes = {
+        autumn_night_transparent = {
+          "inherits" = "autumn_night";
+          "ui.background" = { };
+        };
+      };
+    };
+
     nix-index = {
       enable = true;
       enableFishIntegration = true;
