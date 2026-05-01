@@ -29,6 +29,11 @@
       url = "github:GitAlias/gitalias";
       flake = false;
     };
+
+    nixos-vscode-server = {
+      url = "github:msteen/nixos-vscode-server";
+      flake = false;
+    };
   };
 
   # Load blueprint
@@ -36,6 +41,6 @@
     inputs:
     inputs.blueprint {
       inherit inputs;
-      nixpkgs.config.allowUnfree = true;
+      # nixpkgs.config.allowUnfree = true;
     };
 }

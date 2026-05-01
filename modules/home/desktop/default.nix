@@ -1,4 +1,4 @@
-{ pkgs, perSystem, ... }:
+{ pkgs, ... }:
 {
   imports = [
     ./hyprland.nix
@@ -10,6 +10,7 @@
     ./zen.nix
     ./easyeffects
     ./mime.nix
+    ./ai.nix
   ];
 
   home.packages = with pkgs; [
@@ -28,6 +29,7 @@
     vesktop
     gimp3
     zed-editor
+    slack
 
     # Gaming
     mangohud
@@ -51,6 +53,11 @@
         gpu-context = "waylandvk";
         target-colorspace-hint = "auto";
       };
+    };
+
+    vscode = {
+      enable = true;
+      package = pkgs.vscode.fhs;
     };
   };
 }

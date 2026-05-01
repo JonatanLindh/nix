@@ -62,6 +62,10 @@
         btop = pkgs.btop.override { cudaSupport = true; };
       })
     ];
+
+    config = {
+      allowUnfree = true;
+    };
   };
 
   networking.hostName = "xps";

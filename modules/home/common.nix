@@ -16,6 +16,7 @@
     clang
 
     apptainer
+    graphviz
   ];
 
   programs = {

@@ -1,12 +1,22 @@
-{ pkgs, flake, ... }:
+{
+  pkgs,
+  flake,
+  inputs,
+  ...
+}:
 {
   imports = [
     flake.homeModules.common
     flake.homeModules.desktop
+    "${inputs.nixos-vscode-server}/modules/vscode-server/home.nix"
   ];
+
+  services.vscode-server.enable = true;
 
   home.packages = with pkgs; [
     blender
+    darktable
+    rapid-photo-downloader
   ];
 
   # Easyeffects autoload

@@ -50,7 +50,7 @@
 
                   "KCFLAGS+=-march=znver5"
                   "KCFLAGS+=-mtune=znver5"
-                  "KCFLAGS+=-O3"
+                  "KCFLAGS+=-O2"
                   "KCFLAGS+=-pipe"
                   "KCFLAGS+=-Wframe-larger-than=4096"
                 ];
@@ -68,10 +68,36 @@
 
                       # # 9950X3D
                       AMD_3D_VCACHE = yes;
-                      X86_AMD_PSTATE_UT = module;
 
                       # # Topology
                       NR_CPUS = lib.mkForce (freeform "32");
+                    }
+                    // {
+                      # Disable unused
+
+                      # CPU & PLATFORM (Safe to disable Intel CPU features)
+                      CPU_SUP_INTEL = pkgs.lib.mkForce no;
+                      CPU_SUP_CENTAUR = pkgs.lib.mkForce no;
+                      CPU_SUP_ZHAOXIN = pkgs.lib.mkForce no;
+
+                      # Virtualization (Disable Intel VT-d, keep AMD-Vi)
+                      INTEL_IOMMU = pkgs.lib.mkForce no;
+
+                      # Disable Nvidia
+                      DRM_NOUVEAU = pkgs.lib.mkForce no;
+
+                      # Disable Intel Graphics
+                      DRM_I915 = pkgs.lib.mkForce no;
+                      DRM_XE = pkgs.lib.mkForce no;
+                      DRM_GMA500 = pkgs.lib.mkForce no;
+
+                      # Disable Legacy AMD (Pre-GCN)
+                      DRM_RADEON = pkgs.lib.mkForce no;
+                      DRM_AMDGPU_SI = pkgs.lib.mkForce no; # Southern Islands (HD 7000 series)
+                      DRM_AMDGPU_CIK = pkgs.lib.mkForce no; # Sea Islands (R9 200 series)
+
+                      # AUDIO & USB
+                      USB4 = module;
                     };
                 };
 
@@ -85,6 +111,7 @@
 
     config = {
       rocmSupport = true;
+      allowUnfree = true;
     };
   };
 
@@ -118,9 +145,21 @@
     };
   };
 
-  hardware.amdgpu = {
-    initrd.enable = true;
+  hardware = {
+    amdgpu = {
+      initrd.enable = true;
+    };
+
+    graphics.extraPackages = with pkgs; [
+      rocmPackages.clr.icd
+    ];
+
+    ckb-next.enable = true;
   };
+
+  environment.systemPackages = with pkgs; [
+    ckb-next
+  ];
 
   # ZRAM Swap
   zramSwap = {
@@ -137,13 +176,13 @@
   networking = {
     hostName = "desktop";
     interfaces = {
-        ens3 = {
-          wakeOnLan.enable = true;
-        };
+      ens3 = {
+        wakeOnLan.enable = true;
       };
-      firewall = {
-        allowedUDPPorts = [ 9 ];
-      };
+    };
+    firewall = {
+      allowedUDPPorts = [ 9 ];
+    };
   };
 
   system.stateVersion = "25.11"; # initial nixos state
