@@ -151,7 +151,7 @@
     };
 
     graphics.extraPackages = with pkgs; [
-      rocmPackages.clr.icd
+      rocmPackages.clr
     ];
 
     ckb-next.enable = true;
@@ -171,6 +171,11 @@
     enable = true;
     scheduler = "scx_lavd";
     extraArgs = [ "--autopilot" ];
+  };
+
+  services.sunshine = {
+    enable = true;
+    openFirewall = true;
   };
 
   networking = {
