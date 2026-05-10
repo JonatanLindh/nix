@@ -23,6 +23,7 @@
     loupe # image viewer
     gnome-logs
     papers
+    darktable
 
     spotify
     google-chrome
@@ -53,11 +54,6 @@
         gpu-context = "waylandvk";
         target-colorspace-hint = "auto";
       };
-    };
-
-    vscode = {
-      enable = true;
-      package = pkgs.vscode.fhs;
     };
   };
 }

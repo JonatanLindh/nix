@@ -15,7 +15,6 @@
 
   home.packages = with pkgs; [
     blender
-    darktable
     rapid-photo-downloader
   ];
 
