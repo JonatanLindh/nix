@@ -26,7 +26,16 @@
 
     vscode = {
       enable = true;
-      package = pkgs.vscode.fhs;
+      profiles.default.extensions = with pkgs.nix-vscode-extensions.vscode-marketplace; [
+        ms-toolsai.jupyter
+        ms-toolsai.jupyter-renderers
+        marimo-team.vscode-marimo
+        pkief.material-icon-theme
+        ms-python.python
+        mechatroner.rainbow-csv
+        ms-vscode-remote.remote-ssh
+        charliermarsh.ruff
+      ];
     };
 
     git = {

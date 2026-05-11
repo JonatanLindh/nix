@@ -1,4 +1,9 @@
-{ pkgs, flake, ... }:
+{
+  pkgs,
+  flake,
+  inputs,
+  ...
+}:
 {
 
   imports = [
@@ -11,6 +16,7 @@
     hostPlatform = "x86_64-linux";
 
     overlays = [
+      inputs.nix-vscode-extensions.overlays.default
       (
         pkgs': pkgs:
         let

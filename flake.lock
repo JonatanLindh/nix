@@ -521,6 +521,26 @@
         "type": "github"
       }
     },
+    "nix-vscode-extensions": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1778472085,
+        "narHash": "sha256-NlBm4uiTIEJb/FCPBnh7xJNvuDOzk15k1vEOniqDHoA=",
+        "owner": "nix-community",
+        "repo": "nix-vscode-extensions",
+        "rev": "7e5f123b1b2cb998c2e2781ec6758015ec1ae189",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nix-community",
+        "repo": "nix-vscode-extensions",
+        "type": "github"
+      }
+    },
     "nixos-vscode-server": {
       "flake": false,
       "locked": {
@@ -614,6 +634,7 @@
         "gitalias": "gitalias",
         "home-manager": "home-manager",
         "hyprland": "hyprland",
+        "nix-vscode-extensions": "nix-vscode-extensions",
         "nixos-vscode-server": "nixos-vscode-server",
         "nixpkgs": "nixpkgs_2",
         "zen-browser": "zen-browser"
