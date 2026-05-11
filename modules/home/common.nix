@@ -35,6 +35,10 @@
       settings = {
         user.name = "Jonatan Lindh";
         user.email = "jonatan.lindh1@gmail.com";
+        user.signingkey = "~/.ssh/id_ed25519.pub";
+
+        gpg.format = "ssh";
+        commit.gpgsign = true;
 
         push = {
           autoSetupRemote = true;
