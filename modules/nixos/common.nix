@@ -77,10 +77,7 @@
     gnome.gnome-keyring.enable = true;
     udisks2.enable = true;
     geoclue2.enable = true;
-    blueman = {
-      enable = true;
-      withApplet = false;
-    };
+    blueman.enable = true;
 
     tailscale.enable = true;
     openssh = {

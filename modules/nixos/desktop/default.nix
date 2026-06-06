@@ -1,10 +1,16 @@
-{ pkgs, ... }:
+{
+  pkgs,
+  lib,
+  inputs,
+  ...
+}:
 {
   imports = [
     ./hyprland.nix
     ./1password.nix
     ./steam.nix
     ./flatpak.nix # For Stremio
+    inputs.silentSDDM.nixosModules.default
   ];
 
   hardware = {
@@ -36,32 +42,49 @@
     };
   };
 
-  services.xserver = {
-    enable = true;
-    dpi = 144;
+  services.xserver.xkb = {
+    layout = "se";
+    variant = "";
+  };
 
-    # Configure keymap in X11
-    xkb = {
-      layout = "se";
-      variant = "";
+  services.displayManager.sddm = {
+    enable = true;
+    wayland = {
+      enable = true;
+      compositor = "kwin";
     };
+    settings.Theme.CursorTheme = "breeze_cursors";
   };
 
-  services.displayManager.gdm = {
+  programs.silentSDDM = {
     enable = true;
-    wayland = true;
+    theme = "default";
   };
 
-  programs.seahorse.enable = true;
+  environment.systemPackages = with pkgs; [
+    kdePackages.breeze
+  ];
 
   environment.sessionVariables = {
     NIXOS_OZONE_WL = "1";
   };
 
+  powerManagement.resumeCommands = lib.mkAfter "${pkgs.systemd}/bin/systemctl restart tailscaled";
+
   # Enable networking
   networking = {
-    networkmanager.enable = true;
-    interfaces.tailscale0.mtu = 1200;
+    networkmanager = {
+      enable = true;
+      dispatcherScripts = [
+        {
+          source = pkgs.writeText "99-tailscale" ''
+            #!/bin/sh
+            [ "$2" = "up" ] && systemctl restart tailscaled
+          '';
+          type = "basic";
+        }
+      ];
+    };
 
     firewall = {
       enable = true;

@@ -166,19 +166,17 @@
 
     ssh = {
       enable = true;
-      matchBlocks = {
+      enableDefaultConfig = false;
+      settings = {
         "vera" = {
-          hostname = "vera2.c3se.chalmers.se";
-          user = "lindhjon";
-          identityFile = "~/.ssh/id_ed25519";
-          forwardAgent = true;
+          Hostname = "vera2.c3se.chalmers.se";
+          User = "lindhjon";
+          IdentityFile = "~/.ssh/id_ed25519";
+          ForwardAgent = "yes";
         };
-
         "*" = {
-          extraOptions = {
-            WarnWeakCrypto = "no-pq-kex";
-          };
-          setEnv = {
+          WarnWeakCrypto = "no-pq-kex";
+          SetEnv = {
             TERM = "xterm-256color";
           };
         };
@@ -191,5 +189,6 @@
     ssh-agent.enable = true;
   };
 
-  home.stateVersion = "26.05"; # initial home-manager state
+  home.stateVersion = "26.05";
+  home.enableNixpkgsReleaseCheck = false;
 }
