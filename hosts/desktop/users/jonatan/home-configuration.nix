@@ -16,6 +16,8 @@
   home.packages = with pkgs; [
     blender
     rapid-photo-downloader
+
+    eden
   ];
 
   # Easyeffects autoload

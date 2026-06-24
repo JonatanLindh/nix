@@ -17,6 +17,8 @@
 
     apptainer
     graphviz
+
+    wl-screenrec
   ];
 
   programs = {
@@ -59,6 +61,26 @@
       ];
     };
 
+    jujutsu = {
+      enable = true;
+      settings = {
+        user = {
+          name = "Jonatan Lindh";
+          email = "jonatan.lindh1@gmail.com";
+        };
+
+        signing = {
+          behavior = "drop";
+          backend = "ssh";
+          key = "~/.ssh/id_ed25519.pub";
+        };
+
+        git = {
+          sign-on-push = true;
+        };
+      };
+    };
+
     ghostty = {
       enable = true;
       enableFishIntegration = true;
@@ -72,6 +94,9 @@
 
     fish = {
       enable = true;
+      shellInitLast = ''
+        fish_add_path $HOME/.cargo/bin
+      '';
       shellAbbrs = {
         g = "git";
         sw = "nh os switch";
@@ -160,7 +185,7 @@
       enableFishIntegration = true;
     };
 
-    gemini-cli = {
+    antigravity-cli = {
       enable = true;
     };
 

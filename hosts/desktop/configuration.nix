@@ -2,6 +2,7 @@
   pkgs,
   flake,
   inputs,
+  config,
   ...
 }:
 {
@@ -149,6 +150,8 @@
 
       efi.canTouchEfiVariables = true;
     };
+
+    extraModulePackages = [ config.boot.kernelPackages.xone ];
   };
 
   hardware = {
@@ -161,6 +164,8 @@
     ];
 
     ckb-next.enable = true;
+
+    xone.enable = true;
   };
 
   environment.systemPackages = with pkgs; [
