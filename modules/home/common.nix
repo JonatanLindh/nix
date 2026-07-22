@@ -69,6 +69,10 @@
           email = "jonatan.lindh1@gmail.com";
         };
 
+        ui = {
+          default-command = "log";
+        };
+
         signing = {
           behavior = "drop";
           backend = "ssh";
