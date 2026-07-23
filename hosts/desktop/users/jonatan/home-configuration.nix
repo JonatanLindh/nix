@@ -18,6 +18,7 @@
     rapid-photo-downloader
     hugin
     hdrmerge
+    geeqie
 
     eden
   ];
