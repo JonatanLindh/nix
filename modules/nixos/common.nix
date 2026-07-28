@@ -69,6 +69,13 @@
     alsa.enable = true;
     alsa.support32Bit = true;
     pulse.enable = true;
+
+    extraConfig.pipewire."99-stable-quantum" = {
+      "context.properties" = {
+        "default.clock.quantum" = 1024;
+        "default.clock.min-quantum" = 1024;
+      };
+    };
   };
 
   services = {
