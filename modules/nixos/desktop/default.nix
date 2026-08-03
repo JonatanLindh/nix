@@ -75,15 +75,6 @@
   networking = {
     networkmanager = {
       enable = true;
-      dispatcherScripts = [
-        {
-          source = pkgs.writeText "99-tailscale" ''
-            #!/bin/sh
-            [ "$2" = "up" ] && systemctl restart tailscaled
-          '';
-          type = "basic";
-        }
-      ];
     };
 
     firewall = {
