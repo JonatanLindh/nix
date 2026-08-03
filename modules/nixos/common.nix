@@ -137,13 +137,13 @@
     pciutils
     android-tools
     eduvpn-client
+    github-cli
 
     # archives
     zip
     xz
     unzip
     p7zip
-
   ];
 
   fonts = {
