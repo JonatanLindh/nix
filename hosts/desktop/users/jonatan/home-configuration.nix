@@ -21,6 +21,7 @@
     geeqie
 
     eden
+    r2modman
   ];
 
   # Easyeffects autoload
