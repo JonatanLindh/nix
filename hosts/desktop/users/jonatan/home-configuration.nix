@@ -22,6 +22,8 @@
 
     eden
     r2modman
+
+    qgis
   ];
 
   # Easyeffects autoload
