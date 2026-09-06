@@ -23,6 +23,22 @@
         let
           lib = pkgs'.lib;
           llvmPkgs = pkgs'.llvmPackages_latest;
+
+          ccacheEnv = ''
+            export CCACHE_COMPRESS=1
+            export CCACHE_DIR="${config.programs.ccache.cacheDir}"
+            export CCACHE_UMASK=007
+            export CCACHE_SLOPPINESS=random_seed
+          '';
+
+          ccacheClang = pkgs.writeShellScriptBin "clang" ''
+            ${ccacheEnv}
+            exec ${pkgs.ccache}/bin/ccache ${llvmPkgs.clang-unwrapped}/bin/clang "$@"
+          '';
+          ccacheHostClang = pkgs.writeShellScriptBin "clang" ''
+            ${ccacheEnv}
+            exec ${pkgs.ccache}/bin/ccache ${llvmPkgs.clang}/bin/clang "$@"
+          '';
         in
         {
           btop = pkgs.btop.override { rocmSupport = true; };
@@ -37,15 +53,16 @@
                   # pkgs'.rustPlatform.rustLibSrc
                   llvmPkgs.lld
                   llvmPkgs.libclang
+                  pkgs.ccache
                 ];
 
                 extraMakeFlags = (old.extraMakeFlags or [ ]) ++ [
                   "LLVM=1"
                   "LLVM_IAS=1"
 
-                  "CC=${llvmPkgs.clang-unwrapped}/bin/clang"
+                  "CC=${ccacheClang}/bin/clang"
                   "LD=${llvmPkgs.lld}/bin/ld.lld"
-                  "HOSTCC=${llvmPkgs.clang}/bin/clang"
+                  "HOSTCC=${ccacheHostClang}/bin/clang"
                   "HOSTLD=${llvmPkgs.lld}/bin/ld.lld"
 
                   "AR=${llvmPkgs.llvm}/bin/llvm-ar"
@@ -102,6 +119,16 @@
                       DRM_RADEON = pkgs.lib.mkForce no;
                       DRM_AMDGPU_SI = pkgs.lib.mkForce no; # Southern Islands (HD 7000 series)
                       DRM_AMDGPU_CIK = pkgs.lib.mkForce no; # Sea Islands (R9 200 series)
+
+                      # VM-guest-only display stubs (this box is a KVM host, never a guest)
+                      DRM_VIRTIO_GPU = pkgs.lib.mkForce no;
+                      DRM_QXL = pkgs.lib.mkForce no;
+                      DRM_VMWGFX = pkgs.lib.mkForce no;
+                      DRM_VBOXVIDEO = pkgs.lib.mkForce no;
+                      DRM_CIRRUS_QEMU = pkgs.lib.mkForce no;
+                      DRM_BOCHS = pkgs.lib.mkForce no;
+                      DRM_AST = pkgs.lib.mkForce no; # server BMC framebuffer
+                      DRM_MGAG200 = pkgs.lib.mkForce no; # server BMC framebuffer
 
                       # AUDIO & USB
                       USB4 = module;
