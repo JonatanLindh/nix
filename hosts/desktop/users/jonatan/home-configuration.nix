@@ -19,11 +19,12 @@
     hugin
     hdrmerge
     geeqie
+    qgis
 
+    heroic
+    prismlauncher
     eden
     r2modman
-
-    qgis
   ];
 
   # Easyeffects autoload

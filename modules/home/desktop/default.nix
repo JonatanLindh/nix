@@ -34,9 +34,7 @@
 
     # Gaming
     mangohud
-    heroic
     protonup-qt
-    prismlauncher
 
     # Typst
     typst
