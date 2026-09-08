@@ -88,6 +88,8 @@
       };
     };
 
+    devenv.enable = true;
+
     bash = {
       enable = true;
     };
