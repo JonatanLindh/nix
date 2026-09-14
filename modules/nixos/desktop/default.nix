@@ -67,6 +67,7 @@
 
   environment.sessionVariables = {
     NIXOS_OZONE_WL = "1";
+    GTK_IM_MODULE = "simple";
   };
 
   powerManagement.resumeCommands = lib.mkAfter "${pkgs.systemd}/bin/systemctl restart tailscaled";
