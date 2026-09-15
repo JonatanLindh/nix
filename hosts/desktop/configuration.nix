@@ -63,7 +63,8 @@
                   "CC=${ccacheClang}/bin/clang"
                   "LD=${llvmPkgs.lld}/bin/ld.lld"
                   "HOSTCC=${ccacheHostClang}/bin/clang"
-                  "HOSTLD=${llvmPkgs.lld}/bin/ld.lld"
+                  "HOSTLD=${llvmPkgs.bintools}/bin/ld.lld"
+                  "HOSTLDFLAGS=--ld-path=${llvmPkgs.bintools}/bin/ld.lld"
 
                   "AR=${llvmPkgs.llvm}/bin/llvm-ar"
                   "NM=${llvmPkgs.llvm}/bin/llvm-nm"
