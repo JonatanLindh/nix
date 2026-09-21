@@ -3,10 +3,7 @@
 
   imports = [
     ./jonatan.nix
-    # inputs.home-manager.nixosModules.default
-    # inputs.srvos.nixosModules.common
-    # inputs.srvos.nixosModules.mixins-nix-experimental
-    # inputs.srvos.nixosModules.mixins-terminfo
+    ./krb5.nix
   ];
 
   nix = {

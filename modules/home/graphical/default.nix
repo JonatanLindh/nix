@@ -21,6 +21,7 @@
     nautilus # file manager
     gnome-disk-utility
     gnome-font-viewer
+    gnome-connections
     loupe # image viewer
     gnome-logs
     papers

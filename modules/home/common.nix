@@ -179,6 +179,7 @@ in
 
     ssh = {
       enable = true;
+      package = pkgs.openssh_gssapi;
       enableDefaultConfig = false;
       settings = {
         "vera" = {
@@ -186,6 +187,13 @@ in
           User = "lindhjon";
           IdentityFile = "~/.ssh/id_ed25519";
           ForwardAgent = "yes";
+        };
+        "chalmers" = {
+          Hostname = "remote12.chalmers.se";
+          User = "lindhjon";
+          ForwardAgent = "yes";
+          GSSAPIAuthentication = "yes";
+          GSSAPIDelegateCredentials = "yes";
         };
         "*" = {
           WarnWeakCrypto = "no-pq-kex";
