@@ -83,7 +83,11 @@
     geoclue2.enable = true;
     blueman.enable = true;
 
-    tailscale.enable = true;
+    tailscale = {
+      enable = true;
+      # Let the user drive tailscale (set/up/down/serve/funnel) without sudo, e.g. from the bar.
+      extraSetFlags = [ "--operator=jonatan" ];
+    };
     openssh = {
       enable = true;
       settings = {
@@ -126,6 +130,7 @@
   environment.systemPackages = with pkgs; [
     btop
     fzf
+    skim
     wget
     curl
     gcc
@@ -157,10 +162,13 @@
       inter
       nerd-fonts.symbols-only
       nerd-fonts.fira-code
+      nerd-fonts.jetbrains-mono
     ];
 
     fontconfig = {
       enable = true;
+      # Anything asking for "monospace" (the quickshell bar, ...) follows this.
+      defaultFonts.monospace = [ "JetBrainsMono Nerd Font" ];
     };
   };
 

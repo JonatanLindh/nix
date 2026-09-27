@@ -163,9 +163,10 @@ hl.window_rule({
 
 -- Layer rules
 hl.layer_rule({
-    name  = "waybar-blur",
-    match = { namespace = "waybar" },
+    name  = "bar-blur",
+    match = { namespace = "quickshell:bar" },
     blur  = true,
+    blur_popups = true, -- the bar's drop-down panels
 })
 
 -- Input devices
@@ -191,11 +192,7 @@ hl.bind("SUPER + Q", hl.dsp.exec_cmd(Launch "ghostty"))
 hl.bind("SUPER + C", hl.dsp.window.close())
 hl.bind("SUPER + E", hl.dsp.exec_cmd(Launch "nautilus"))
 hl.bind("SUPER + P", hl.dsp.window.float({ action = "toggle" }))
-hl.bind(
-    "SUPER + SUPER_L",
-    hl.dsp.exec_cmd(LaunchOnce("tofi-drun", "--drun-launch=true", "pkill")),
-    { release = true }
-)
+hl.bind("SUPER + SUPER_L", hl.dsp.global("quickshell:launcher"), { release = true }) -- app launcher (quickshell)
 hl.bind("SUPER + J", hl.dsp.group.toggle())
 hl.bind("SUPER + F", hl.dsp.window.fullscreen(0))
 hl.bind("SUPER + L", function()
@@ -204,7 +201,10 @@ hl.bind("SUPER + L", function()
     hl.workspace_rule({ workspace = ws.name, layout = next_layout })
     Debug("Layout (" .. ws.name .. "): " .. next_layout)
 end)
-hl.bind("SUPER + M", hl.dsp.exec_cmd(Launch "wleave"))
+hl.bind("SUPER + M", hl.dsp.global("quickshell:session")) -- session menu (quickshell)
+hl.bind("SUPER + V", hl.dsp.global("quickshell:clip")) -- clipboard history (quickshell)
+hl.bind("SUPER + N", hl.dsp.global("quickshell:notif")) -- notification history (quickshell)
+hl.bind("SUPER + SHIFT + P", hl.dsp.global("quickshell:op")) -- 1password (quickshell)
 
 hl.bind("SUPER + left", hl.dsp.focus({ direction = "left" }))
 hl.bind("SUPER + right", hl.dsp.focus({ direction = "right" }))

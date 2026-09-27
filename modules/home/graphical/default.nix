@@ -2,15 +2,13 @@
 {
   imports = [
     ./hyprland
-    ./tofi.nix
-    ./mako.nix
-    ./waybar.nix
-    ./wleave.nix
+    ./quickshell
     ./theme.nix
     ./browser.nix
     ./easyeffects
     ./zellij
     ./mime.nix
+    ./clipboard.nix
     ./ai.nix
   ];
 
@@ -62,7 +60,7 @@
       enableFishIntegration = true;
       settings = {
         theme = "Monokai Pro Spectrum";
-        font-family = "FiraCode Nerd Font Mono";
+        font-family = "JetBrainsMono Nerd Font";
         font-size = 15;
         background-opacity = 0.9;
       };

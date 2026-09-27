@@ -9,7 +9,7 @@
       wallpaper = [
         {
           monitor = "";
-          path = "/home/jonatan/Pictures/Wallpapers/geometrics-d.jxl";
+          path = "/home/jonatan/Pictures/Wallpapers/wallpaper.jpg";
           fit_mode = "cover";
         }
       ];
