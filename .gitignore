@@ -7,3 +7,6 @@ claude-summary.md
 # nix build output links
 result
 result-*
+
+# Lua LSP config, symlinked to ~/.config/hypr/.luarc.json
+.luarc.json

@@ -13,6 +13,8 @@
 
   services.vscode-server.enable = true;
 
+  wayland.windowManager.hyprland.extraLuaFiles.host = ./host.lua;
+
   home.packages = with pkgs; [
     blender
     rapid-photo-downloader
