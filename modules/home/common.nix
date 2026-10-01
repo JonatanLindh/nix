@@ -189,7 +189,6 @@
 
   services = {
     udiskie.enable = true;
-    ssh-agent.enable = true;
   };
 
   home.stateVersion = "26.05";
