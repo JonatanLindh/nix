@@ -9,6 +9,7 @@
     ./theme.nix
     ./browser.nix
     ./easyeffects
+    ./zellij
     ./mime.nix
     ./ai.nix
   ];
