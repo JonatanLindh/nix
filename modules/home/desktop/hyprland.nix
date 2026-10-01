@@ -8,6 +8,13 @@
 
   services.hyprpolkitagent.enable = true;
 
+  # Issue restore tokens by default so Electron apps only show the share picker once
+  xdg.configFile."hypr/xdph.conf".text = ''
+    screencopy {
+      allow_token_by_default = true
+    }
+  '';
+
   services.hyprlauncher = {
     enable = true;
     settings = {
