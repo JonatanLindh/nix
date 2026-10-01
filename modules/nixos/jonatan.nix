@@ -1,4 +1,4 @@
-{ pkgs, ... }:
+{ pkgs, lib, ... }:
 {
   users.users.jonatan = {
     uid = 1000;
@@ -23,6 +23,8 @@
     shell = pkgs.fish;
 
     # Allow to SSH from any host to any host
-    # openssh.authorizedKeys.keyFiles = [ ../../authorized_keys ];
+    openssh.authorizedKeys.keys = lib.mapAttrsToList (host: key: "${key} ${host}") (
+      import ../../ssh-keys.nix
+    );
   };
 }

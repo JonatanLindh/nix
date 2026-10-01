@@ -1,4 +1,17 @@
-{ pkgs, inputs, ... }:
+{
+  pkgs,
+  lib,
+  inputs,
+  ...
+}:
+let
+  email = "jonatan.lindh1@gmail.com";
+
+  # Keys trusted when verifying commit signatures
+  allowedSigners = pkgs.writeText "allowed_signers" (
+    lib.concatMapStrings (key: "${email} ${key}\n") (lib.attrValues (import ../../ssh-keys.nix))
+  );
+in
 {
   home.packages = with pkgs; [
     ripgrep
@@ -28,10 +41,11 @@
 
       settings = {
         user.name = "Jonatan Lindh";
-        user.email = "jonatan.lindh1@gmail.com";
+        user.email = email;
         user.signingkey = "~/.ssh/id_ed25519.pub";
 
         gpg.format = "ssh";
+        gpg.ssh.allowedSignersFile = "${allowedSigners}";
         commit.gpgsign = true;
 
         push = {
@@ -49,7 +63,7 @@
       settings = {
         user = {
           name = "Jonatan Lindh";
-          email = "jonatan.lindh1@gmail.com";
+          inherit email;
         };
 
         ui = {
@@ -60,6 +74,7 @@
           behavior = "drop";
           backend = "ssh";
           key = "~/.ssh/id_ed25519.pub";
+          backends.ssh.allowed-signers = "${allowedSigners}";
         };
 
         git = {
@@ -189,7 +204,6 @@
 
   services = {
     udiskie.enable = true;
-    ssh-agent.enable = true;
   };
 
   home.stateVersion = "26.05";
