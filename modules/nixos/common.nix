@@ -82,7 +82,7 @@
     fwupd.enable = true;
     printing.enable = true;
     gnome.gnome-keyring.enable = true;
-    udisk2.enable = true;
+    udisks2.enable = true;
     geoclue2.enable = true;
     blueman.enable = true;
 
