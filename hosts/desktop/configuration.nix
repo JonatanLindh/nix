@@ -23,22 +23,6 @@
         let
           lib = pkgs'.lib;
           llvmPkgs = pkgs'.llvmPackages_latest;
-
-          ccacheEnv = ''
-            export CCACHE_COMPRESS=1
-            export CCACHE_DIR="${config.programs.ccache.cacheDir}"
-            export CCACHE_UMASK=007
-            export CCACHE_SLOPPINESS=random_seed
-          '';
-
-          ccacheClang = pkgs.writeShellScriptBin "clang" ''
-            ${ccacheEnv}
-            exec ${pkgs.ccache}/bin/ccache ${llvmPkgs.clang-unwrapped}/bin/clang "$@"
-          '';
-          ccacheHostClang = pkgs.writeShellScriptBin "clang" ''
-            ${ccacheEnv}
-            exec ${pkgs.ccache}/bin/ccache ${llvmPkgs.clang}/bin/clang "$@"
-          '';
         in
         {
           btop = pkgs.btop.override { rocmSupport = true; };
@@ -53,16 +37,15 @@
                   # pkgs'.rustPlatform.rustLibSrc
                   llvmPkgs.lld
                   llvmPkgs.libclang
-                  pkgs.ccache
                 ];
 
                 extraMakeFlags = (old.extraMakeFlags or [ ]) ++ [
                   "LLVM=1"
                   "LLVM_IAS=1"
 
-                  "CC=${ccacheClang}/bin/clang"
+                  "CC=${llvmPkgs.clang-unwrapped}/bin/clang"
                   "LD=${llvmPkgs.lld}/bin/ld.lld"
-                  "HOSTCC=${ccacheHostClang}/bin/clang"
+                  "HOSTCC=${llvmPkgs.clang}/bin/clang"
                   "HOSTLD=${llvmPkgs.bintools}/bin/ld.lld"
                   "HOSTLDFLAGS=--ld-path=${llvmPkgs.bintools}/bin/ld.lld"
 
@@ -150,19 +133,13 @@
     };
   };
 
-  programs.ccache.enable = true;
-  nix.settings.extra-sandbox-paths = [ config.programs.ccache.cacheDir ];
-
   boot = {
     # kernelPackages = pkgs.linuxPackages_zen;
     kernelPackages = pkgs.linuxPackages_zen_clang;
 
     # # [NEW] Kernel Parameters for 9950X3D + 9070 XT
     kernelParams = [
-      # Force games onto the V-Cache CCD
-      "amd_x3d_vcache.mode=cache"
       "amd_pstate=active"
-      "amd_pstate.shared_mem=1"
 
       # Disable Spectre mitigations for max gaming performance (Optional: remove if paranoid)
       "mitigations=off"
@@ -199,9 +176,10 @@
     xone.enable = true;
   };
 
-  environment.systemPackages = with pkgs; [
-    ckb-next
-  ];
+  # Prefer the V-Cache CCD (the driver has no kernel parameter, only sysfs)
+  services.udev.extraRules = ''
+    ACTION=="add|bind", SUBSYSTEM=="platform", DRIVER=="amd_x3d_vcache", ATTR{amd_x3d_mode}="cache"
+  '';
 
   # ZRAM Swap
   zramSwap = {
@@ -223,12 +201,9 @@
   networking = {
     hostName = "desktop";
     interfaces = {
-      ens3 = {
+      enp8s0 = {
         wakeOnLan.enable = true;
       };
-    };
-    firewall = {
-      allowedUDPPorts = [ 9 ];
     };
   };
 

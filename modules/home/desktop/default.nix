@@ -7,7 +7,7 @@
     ./waybar.nix
     ./wleave.nix
     ./theme.nix
-    ./zen.nix
+    ./browser.nix
     ./easyeffects
     ./mime.nix
     ./ai.nix

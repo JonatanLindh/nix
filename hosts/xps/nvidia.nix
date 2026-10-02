@@ -1,7 +1,6 @@
 {
   pkgs,
   config,
-  perSystem,
   ...
 }:
 {
@@ -35,8 +34,4 @@
       package = config.boot.kernelPackages.nvidiaPackages.latest;
     };
   };
-
-  environment.systemPackages = [
-    perSystem.self.vulkan-hdr-layer
-  ];
 }

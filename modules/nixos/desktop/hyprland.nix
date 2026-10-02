@@ -25,7 +25,6 @@
   };
 
   environment.systemPackages = [
-    perSystem.self.vulkan-hdr-layer
     pkgs.brightnessctl
     perSystem.hyprland.hyprland
   ];
