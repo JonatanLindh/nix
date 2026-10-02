@@ -17,7 +17,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  BRANCH: update-flake-lock
+  # Runs started from another branch get their own update branch and PR
+  BRANCH: ${{ github.ref_name == 'main' && 'update-flake-lock' || format('update-flake-lock-{0}', github.ref_name) }}
   HAS_CLAUDE: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN != '' }}
   # Evaluated before and after the update for the PR summary
   VERSIONS_EXPR: |
@@ -111,7 +112,7 @@ jobs:
           claude_args: |
             --max-turns 60
             --add-dir /nix/store
-            --allowedTools "Read,Edit,Write,Glob,Grep,Bash(.github/scripts/eval-hosts.sh),Bash(./.github/scripts/eval-hosts.sh),Bash(nix eval:*),Bash(git diff:*),Bash(git status:*)"
+            --allowedTools "Read,Edit,Write,Glob,Grep,Bash(.github/scripts/eval-hosts.sh:*),Bash(./.github/scripts/eval-hosts.sh:*),Bash(bash .github/scripts/eval-hosts.sh:*),Bash(nix eval:*),Bash(git diff:*),Bash(git status:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(grep:*),Bash(ls:*)"
 
       - name: Commit fixes
         id: fix
@@ -218,7 +219,7 @@ jobs:
           git push --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "$BRANCH"
 
           title="flake.lock: update"
-          pr=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty')
+          pr=$(gh pr list --head "$BRANCH" --base "$BASE" --state open --json number --jq '.[0].number // empty')
           if [ -z "$pr" ]; then
             draft=""
             [ "$OK" = true ] || draft="--draft"
