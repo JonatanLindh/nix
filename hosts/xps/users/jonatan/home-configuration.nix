@@ -2,6 +2,6 @@
 {
   imports = [
     flake.homeModules.common
-    flake.homeModules.desktop
+    flake.homeModules.graphical
   ];
 }

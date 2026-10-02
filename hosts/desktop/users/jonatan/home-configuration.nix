@@ -7,7 +7,7 @@
 {
   imports = [
     flake.homeModules.common
-    flake.homeModules.desktop
+    flake.homeModules.graphical
     "${inputs.nixos-vscode-server}/modules/vscode-server/home.nix"
   ];
 

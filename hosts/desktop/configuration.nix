@@ -10,7 +10,7 @@
   imports = [
     ./hardware-configuration.nix
     flake.nixosModules.common
-    flake.nixosModules.desktop
+    flake.nixosModules.graphical
   ];
 
   nixpkgs = {

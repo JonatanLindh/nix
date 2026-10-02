@@ -10,7 +10,7 @@
     ./hardware-configuration.nix
     ./nvidia.nix
     flake.nixosModules.common
-    flake.nixosModules.desktop
+    flake.nixosModules.graphical
     flake.nixosModules.tlp
   ];
 
