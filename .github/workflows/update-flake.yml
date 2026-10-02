@@ -1,0 +1,235 @@
+name: Update flake
+
+# Only ever triggered by the schedule or by someone with write access.
+# Do not add pull_request / issue_comment triggers: the repo is public and
+# this job has write access and a Claude credential.
+on:
+  schedule:
+    - cron: "0 4 * * 1" # Mondays 04:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: update-flake
+  cancel-in-progress: true
+
+env:
+  # Runs started from another branch get their own update branch and PR
+  BRANCH: ${{ github.ref_name == 'main' && 'update-flake-lock' || format('update-flake-lock-{0}', github.ref_name) }}
+  HAS_CLAUDE: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN != '' }}
+  # Evaluated before and after the update for the PR summary
+  VERSIONS_EXPR: |
+    c: {
+      "kernel (desktop)" = c.desktop.config.boot.kernelPackages.kernel.version;
+      "kernel (xps)" = c.xps.config.boot.kernelPackages.kernel.version;
+      "hyprland" = c.desktop.config.programs.hyprland.package.version;
+      "mesa" = c.desktop.pkgs.mesa.version;
+      "nvidia (xps)" = c.xps.config.hardware.nvidia.package.version;
+      "nixpkgs" = c.desktop.config.system.nixos.version;
+    }
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ github.token }}
+
+      - name: Versions before
+        run: nix eval --json .#nixosConfigurations --apply "$VERSIONS_EXPR" > "$RUNNER_TEMP/before.json" || echo '{}' > "$RUNNER_TEMP/before.json"
+
+      - name: Update flake.lock
+        id: update
+        run: |
+          nix flake update 2>&1 | tee "$RUNNER_TEMP/update.log"
+          if git diff --quiet -- flake.lock; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit lock file
+        if: steps.update.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B "$BRANCH"
+          git commit -m "flake.lock: update" -- flake.lock
+
+      - name: Evaluate hosts
+        id: eval
+        if: steps.update.outputs.changed == 'true'
+        continue-on-error: true
+        run: .github/scripts/eval-hosts.sh
+
+      - name: Fix evaluation errors and warnings with Claude
+        if: (steps.eval.outcome == 'failure' || steps.eval.outputs.warnings == 'true') && env.HAS_CLAUDE == 'true'
+        continue-on-error: true
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ github.token }}
+          prompt: |
+            This is a NixOS + home-manager flake for two hosts (desktop, xps).
+            flake.lock was just updated and the configuration now fails to
+            evaluate or evaluates with warnings.
+
+            Run `.github/scripts/eval-hosts.sh` to reproduce. It evaluates both
+            hosts and writes the output to eval-desktop.log and eval-xps.log.
+
+            Fix the Nix files so that both hosts evaluate without errors and
+            without evaluation warnings, then re-run the script to confirm.
+
+            Rules:
+            - Errors come first. Only fix warnings caused by this repository's
+              own files (deprecated or renamed options it sets). Leave warnings
+              that come from upstream modules or flake inputs, and list them in
+              your summary instead.
+            - Make the smallest change that keeps the existing behaviour. The
+              usual cause is an option or package that was renamed, moved or
+              removed upstream; find the replacement in the nixpkgs or
+              home-manager source under /nix/store and use it.
+            - Do not get the config to evaluate by deleting or disabling
+              functionality. If something has no replacement, leave it broken
+              and explain why in your final message.
+            - Do not edit flake.lock, flake.nix inputs, hardware-configuration.nix
+              or anything under .github/.
+            - You can only evaluate, not build. Do not claim the result builds.
+            - Do not commit; the workflow commits your changes.
+
+            When done, write a short summary of what broke and what you changed
+            (or why you could not fix it) to claude-summary.md in the repo root.
+            It is shown in the pull request and is not committed.
+          claude_args: |
+            --max-turns 60
+            --add-dir /nix/store
+            --allowedTools "Read,Edit,Write,Glob,Grep,Bash(.github/scripts/eval-hosts.sh:*),Bash(./.github/scripts/eval-hosts.sh:*),Bash(bash .github/scripts/eval-hosts.sh:*),Bash(nix eval:*),Bash(git diff:*),Bash(git status:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(grep:*),Bash(ls:*)"
+
+      - name: Commit fixes
+        id: fix
+        if: steps.eval.outcome == 'failure' || steps.eval.outputs.warnings == 'true'
+        run: |
+          git checkout -- flake.lock .github
+          git add -A -- . ':!eval-*.log' ':!claude-summary.md' ':!.github'
+          if git diff --cached --quiet; then
+            echo "fixed=false" >> "$GITHUB_OUTPUT"
+          else
+            git commit -m "fix evaluation errors and warnings after flake update"
+            echo "fixed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Evaluate hosts again
+        id: reeval
+        if: steps.fix.outputs.fixed == 'true'
+        continue-on-error: true
+        run: .github/scripts/eval-hosts.sh
+
+      - name: Versions after
+        if: steps.update.outputs.changed == 'true'
+        run: nix eval --json .#nixosConfigurations --apply "$VERSIONS_EXPR" > "$RUNNER_TEMP/after.json" || echo '{}' > "$RUNNER_TEMP/after.json"
+
+      - name: Write PR body
+        id: body
+        if: steps.update.outputs.changed == 'true'
+        env:
+          EVAL: ${{ steps.eval.outcome }}
+          FIXED: ${{ steps.fix.outputs.fixed }}
+          REEVAL: ${{ steps.reeval.outcome }}
+          WARNINGS: ${{ steps.reeval.outputs.warnings || steps.eval.outputs.warnings }}
+        run: |
+          body="$RUNNER_TEMP/body.md"
+          if [ "$FIXED" = true ] && [ "$REEVAL" = success ]; then
+            status="The update caused evaluation errors or warnings, and Claude changed the config in a separate commit. Review that commit before merging."
+            ok=true
+          elif [ "$FIXED" != true ] && [ "$EVAL" = success ]; then
+            status="Both hosts evaluate."
+            ok=true
+          else
+            status="**Evaluation fails.** Not safe to merge as is."
+            ok=false
+          fi
+          if [ "$ok" = true ] && [ "$WARNINGS" = true ]; then
+            status="$status There are still evaluation warnings; see the logs below."
+          fi
+          echo "ok=$ok" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "Automated weekly \`nix flake update\`."
+            echo
+            echo "$status"
+            echo
+            echo "Nothing was built, so build-time failures are not covered."
+            echo
+            echo "### Versions"
+            echo
+            # Rows whose version changed are bold
+            echo "| | before | after |"
+            echo "|---|---|---|"
+            jq -r -n --slurpfile b "$RUNNER_TEMP/before.json" --slurpfile a "$RUNNER_TEMP/after.json" '
+              ($b[0] + $a[0] | keys[]) as $k
+              | ($b[0][$k] // "?") as $old
+              | ($a[0][$k] // "?") as $new
+              | if $old != $new
+                then "| **\($k)** | \($old) | **\($new)** |"
+                else "| \($k) | \($old) | \($new) |"
+                end'
+            echo
+            echo "### Inputs"
+            echo
+            echo '```'
+            grep -v -E '^(warning|unpacking|copying|fetching)' "$RUNNER_TEMP/update.log" || true
+            echo '```'
+            if [ -s claude-summary.md ]; then
+              echo
+              echo "### Claude's summary"
+              echo
+              cat claude-summary.md
+            fi
+            # Logs are only worth showing when something is wrong
+            if [ "$ok" != true ] || [ "$WARNINGS" = true ]; then
+              for log in eval-*.log; do
+                [ -e "$log" ] || continue
+                echo
+                echo "### ${log%.log}"
+                echo
+                echo '```'
+                grep -v -E '^(copying path|unpacking) ' "$log" | tail -n 60
+                echo
+                echo '```'
+              done
+            fi
+          } > "$body"
+
+      - name: Push branch and open PR
+        if: steps.update.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OK: ${{ steps.body.outputs.ok }}
+          BASE: ${{ github.ref_name }}
+        run: |
+          git push --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "$BRANCH"
+
+          title="flake.lock: update"
+          pr=$(gh pr list --head "$BRANCH" --base "$BASE" --state open --json number --jq '.[0].number // empty')
+          if [ -z "$pr" ]; then
+            draft=""
+            [ "$OK" = true ] || draft="--draft"
+            gh pr create --base "$BASE" --head "$BRANCH" --title "$title" --body-file "$RUNNER_TEMP/body.md" $draft
+          else
+            gh pr edit "$pr" --title "$title" --body-file "$RUNNER_TEMP/body.md"
+            if [ "$OK" = true ]; then gh pr ready "$pr" || true; else gh pr ready "$pr" --undo || true; fi
+          fi
+
+      # Mark the run as failed so GitHub notifies you
+      - name: Report evaluation failure
+        if: steps.update.outputs.changed == 'true' && steps.body.outputs.ok != 'true'
+        run: exit 1

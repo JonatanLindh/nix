@@ -17,11 +17,6 @@
     graphics = {
       enable = true;
       enable32Bit = true;
-
-      extraPackages = with pkgs; [
-        intel-media-driver
-        libva-utils
-      ];
     };
 
     enableAllFirmware = true;
@@ -63,6 +58,7 @@
 
   environment.systemPackages = with pkgs; [
     kdePackages.breeze
+    libva-utils
   ];
 
   environment.sessionVariables = {

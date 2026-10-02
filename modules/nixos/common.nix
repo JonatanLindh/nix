@@ -17,20 +17,20 @@
       ];
       trusted-users = [ "@wheel" ];
       cores = 0;
-      max-jobs = 48;
+      max-jobs = "auto";
       download-buffer-size = 524288000;
       auto-optimise-store = true;
 
       extra-substituters = [
         "https://hyprland.cachix.org"
-        "https://cuda-maintainers.cachix.org"
+        "https://cache.nixos-cuda.org"
         "https://numtide.cachix.org"
         "https://nix-community.cachix.org"
       ];
 
       extra-trusted-public-keys = [
         "hyprland.cachix.org-1:a7pgxzMz7+chwVL3/pzj6jIBMioiJM7ypFP8PwtkuGc="
-        "cuda-maintainers.cachix.org-1:0dq3bujKpuEPMCX6U4WylrUDZ9JyUG0VpVZa7CNfq5E="
+        "cache.nixos-cuda.org:74DUi4Ye579gUqzH4ziL9IyiJBlDpMRn9MBN8oNan9M="
         "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
         "numtide.cachix.org-1:2ps1kLBUWjxIneOy1Ik6cQjb41X0iXVXeHigGmycPPE="
       ];
@@ -89,6 +89,10 @@
     tailscale.enable = true;
     openssh = {
       enable = true;
+      settings = {
+        PasswordAuthentication = false;
+        KbdInteractiveAuthentication = false;
+      };
     };
 
     ananicy = {

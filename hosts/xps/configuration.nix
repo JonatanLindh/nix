@@ -23,7 +23,7 @@
       system = "x86_64-linux";
       sshUser = "jonatan";
       sshKey = "/home/jonatan/.ssh/id_ed25519";
-      maxJobs = 48;
+      maxJobs = 32;
       speedFactor = 2;
       supportedFeatures = [
         "nixos-test"
@@ -39,7 +39,7 @@
 
     # WiFi speed is slow and crashes by default (https://bugzilla.kernel.org/show_bug.cgi?id=213381)
     # Tuning based on iwlwifi reference(https://wiki.archlinux.org/title/Network_configuration/Wireless#iwlwifi)
-    extraModprobeConfig = "options iwlwifi power_save=1 11n_disable=8 kvm.ignore_msrs=1";
+    extraModprobeConfig = "options iwlwifi power_save=1 11n_disable=8";
 
     kernelModules = [ "nvidia-uvm" ];
     kernelParams = [
@@ -75,6 +75,8 @@
   };
 
   networking.hostName = "xps";
+
+  hardware.graphics.extraPackages = [ pkgs.intel-media-driver ];
 
   services = {
     thermald.enable = true;
