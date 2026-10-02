@@ -4,6 +4,7 @@
   home.packages = with pkgs; [
     hyprpicker
     hyprshot
+    grim # portal screenshots (xdph)
   ];
 
   services.hyprpolkitagent.enable = true;

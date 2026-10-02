@@ -1,5 +1,5 @@
 {
-  description = "Sharing home-manager modules between nixos and darwin";
+  description = "NixOS and home-manager configuration for desktop and xps";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";

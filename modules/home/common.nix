@@ -19,10 +19,6 @@
   ];
 
   programs = {
-    firefox = {
-      enable = true;
-    };
-
     git = {
       enable = true;
 
@@ -141,7 +137,6 @@
 
     zoxide = {
       enable = true;
-      enableNushellIntegration = true;
       enableFishIntegration = true;
       options = [ "--cmd cd" ];
     };
