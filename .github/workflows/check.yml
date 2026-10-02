@@ -1,0 +1,35 @@
+name: Check
+
+# Evaluates both hosts on every push. No secrets and a read-only token, so
+# this is safe to run for any branch.
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ github.token }}
+
+      - name: Evaluate hosts
+        id: eval
+        run: .github/scripts/eval-hosts.sh
+
+      - name: Flag evaluation warnings
+        if: steps.eval.outputs.warnings == 'true'
+        run: echo "::warning::Evaluation warnings found, see the 'Evaluate hosts' step"

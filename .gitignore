@@ -1,0 +1,9 @@
+# Written by .github/scripts/eval-hosts.sh and the update workflow
+eval-*.log
+claude-summary.md
+.eval-checked
+.eval-checked.tmp
+
+# nix build output links
+result
+result-*
