@@ -193,11 +193,6 @@
     extraArgs = [ "--autopilot" ];
   };
 
-  services.sunshine = {
-    enable = true;
-    openFirewall = true;
-  };
-
   networking = {
     hostName = "desktop";
     interfaces = {
