@@ -39,6 +39,9 @@ ShellRoot {
             appid: "quickshell"
             name: modelData
             onPressed: shell.toggle(modelData)
+            // The launcher is a release bind (tap SUPER), and Hyprland's global dispatcher
+            // forwards a release bind as a "released" event, so react to that too.
+            onReleased: if (modelData === "launcher") shell.toggle(modelData)
         }
     }
 

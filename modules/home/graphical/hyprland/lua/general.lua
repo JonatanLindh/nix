@@ -163,9 +163,9 @@ hl.window_rule({
 
 -- Layer rules
 hl.layer_rule({
-    name  = "bar-blur",
-    match = { namespace = "quickshell:bar" },
-    blur  = true,
+    name        = "bar-blur",
+    match       = { namespace = "quickshell:bar" },
+    blur        = true,
     blur_popups = true, -- the bar's drop-down panels
 })
 
@@ -201,9 +201,9 @@ hl.bind("SUPER + L", function()
     hl.workspace_rule({ workspace = ws.name, layout = next_layout })
     Debug("Layout (" .. ws.name .. "): " .. next_layout)
 end)
-hl.bind("SUPER + M", hl.dsp.global("quickshell:session")) -- session menu (quickshell)
-hl.bind("SUPER + V", hl.dsp.global("quickshell:clip")) -- clipboard history (quickshell)
-hl.bind("SUPER + N", hl.dsp.global("quickshell:notif")) -- notification history (quickshell)
+hl.bind("SUPER + M", hl.dsp.global("quickshell:session"))    -- session menu (quickshell)
+hl.bind("SUPER + V", hl.dsp.global("quickshell:clip"))       -- clipboard history (quickshell)
+hl.bind("SUPER + N", hl.dsp.global("quickshell:notif"))      -- notification history (quickshell)
 hl.bind("SUPER + SHIFT + P", hl.dsp.global("quickshell:op")) -- 1password (quickshell)
 
 hl.bind("SUPER + left", hl.dsp.focus({ direction = "left" }))
