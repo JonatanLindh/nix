@@ -22,7 +22,9 @@ Panel {
     }
     readonly property var dayEvents: Agenda.on(selected)
     readonly property var nextEvents: Agenda.upcoming(5, dayEvents)
-    readonly property int cellWidth: Math.floor((panelWidth - 2 * Theme.panelPadding) / 8)
+    // Calendars in a stable order, each with its own dot colour.
+    readonly property var calendars: [...new Set(Agenda.events.map(e => e.calendar))].sort()
+    readonly property var palette: ["#7ec3e6", "#b4cd8a", "#e8a87c", "#b79cff", "#f2c46d", "#f28fb1"]
 
     function sameDay(a, b) {
         return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
@@ -47,25 +49,38 @@ Panel {
         return 1 + Math.floor(Math.round((thursday - jan1) / 86400000) / 7);
     }
 
-    function dayLabel(d) {
-        const diff = Math.round((Agenda.dayStart(d) - today) / 86400000);
-        return diff === 0 ? "today" : diff === 1 ? "tomorrow" : diff === -1 ? "yesterday" : Qt.formatDate(d, "ddd dd MMM").toLowerCase();
+    function colorFor(calendar) {
+        return palette[Math.max(0, calendars.indexOf(calendar)) % palette.length];
     }
 
-    // "10:15-12:00" within `day`; ".." where the event runs past the day's edge.
+    // "Today · Monday 19 October", "Tuesday 20 October".
+    function dayLabel(d) {
+        const diff = Math.round((Agenda.dayStart(d) - today) / 86400000);
+        const prefix = diff === 0 ? "Today · " : diff === 1 ? "Tomorrow · " : diff === -1 ? "Yesterday · " : "";
+        return prefix + Qt.formatDate(d, "dddd d MMMM");
+    }
+
+    // "10:15–12:00" within `day`; "…" where the event runs past the day's edge.
     function span(e, day) {
         if (e.allDay)
-            return "all day";
+            return "All day";
         const from = Agenda.dayStart(day), to = Agenda.addDays(from, 1);
-        const s = e.start >= from ? Qt.formatTime(e.start, "HH:mm") : "..";
+        const s = e.start >= from ? Qt.formatTime(e.start, "HH:mm") : "…";
         if (e.end <= e.start)
             return s;
-        return s + "-" + (e.end <= to ? Qt.formatTime(e.end, "HH:mm") : "..");
+        return s + "–" + (e.end <= to ? Qt.formatTime(e.end, "HH:mm") : "…");
+    }
+
+    // "Today 10:15", "Wed 21 13:00", "Fri 23" (all day).
+    function upcomingLabel(e) {
+        const d = root.sameDay(e.start, root.today) ? "Today" : Qt.formatDate(e.start, "ddd d");
+        return e.allDay ? d : d + " " + Qt.formatTime(e.start, "HH:mm");
     }
 
     name: "cal"
-    title: "cal"
-    centered: true
+    title: Qt.formatDate(new Date(viewYear, viewMonth, 1), "MMMM yyyy")
+    side: "center"
+    panelWidth: 380
 
     onVisibleChanged: {
         if (!visible)
@@ -81,124 +96,153 @@ Panel {
         precision: SystemClock.Hours
     }
 
-    TextMetrics {
-        id: digit
-        font.family: Theme.font
-        font.pixelSize: Theme.fontSize
-        text: "0"
-    }
-
     actions: [
-        Action {
-            text: "<"
-            onClicked: root.shift(-1)
-        },
-        MouseArea {
-            // Fixed width so the arrows stay put from "may" to "september".
-            implicitWidth: Math.ceil(digit.advanceWidth * 14)
-            implicitHeight: monthLabel.implicitHeight
-            hoverEnabled: true
-            cursorShape: Qt.PointingHandCursor
+        PillButton {
+            anchors.verticalCenter: parent.verticalCenter
+            text: "Today"
             onClicked: root.goToday()
-
-            BarText {
-                id: monthLabel
-                anchors.centerIn: parent
-                text: Qt.formatDate(new Date(root.viewYear, root.viewMonth, 1), "MMMM yyyy").toLowerCase()
-                color: parent.containsMouse ? Theme.bright : Theme.text
-            }
         },
-        Action {
-            text: ">"
-            onClicked: root.shift(1)
+        Row {
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 4
+
+            CircleButton {
+                icon: "chevron-left"
+                onClicked: root.shift(-1)
+            }
+            CircleButton {
+                icon: "chevron-right"
+                onClicked: root.shift(1)
+            }
         }
     ]
 
-    Note {
+    UiText {
         visible: Agenda.errors.length > 0
-        Layout.topMargin: 12
+        Layout.fillWidth: true
+        Layout.leftMargin: 8
+        Layout.rightMargin: 8
         text: Agenda.errors.join("\n")
-        color: Theme.warn
+        color: Theme.warnText
+        font.pixelSize: Theme.small
+        wrapMode: Text.Wrap
     }
 
-    Note {
+    UiText {
         visible: Agenda.loaded && !Agenda.configured
-        Layout.topMargin: 12
-        text: "no calendars yet. put google calendar \"secret address in ical format\" urls, one per line, in ~/.config/quickshell-calendar/urls"
+        Layout.fillWidth: true
+        Layout.leftMargin: 8
+        Layout.rightMargin: 8
+        text: "No calendars yet. Put Google Calendar \"secret address in iCal format\" URLs, one per line, in ~/.config/quickshell-calendar/urls"
+        dim: true
+        font.pixelSize: Theme.small
+        wrapMode: Text.Wrap
     }
 
-    Item {
-        Layout.leftMargin: Theme.panelPadding
-        Layout.topMargin: 12
-        implicitWidth: grid.implicitWidth
-        implicitHeight: grid.implicitHeight
+    Tile {
+        id: monthTile
 
-        Grid {
-            id: grid
-            columns: 8
+        readonly property real dayWidth: (width - 2 * 8 - 26) / 7
 
+        padding: 8
+        spacing: 2
+
+        // Weekday names over the day columns; the first column is the ISO week.
+        Row {
+            Layout.bottomMargin: 4
+
+            Item {
+                width: 26
+                height: 1
+            }
             Repeater {
-                model: ["wk", "mo", "tu", "we", "th", "fr", "sa", "su"]
+                model: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
-                BarText {
+                UiText {
                     required property string modelData
-                    width: root.cellWidth
-                    height: 26
+                    width: monthTile.dayWidth
                     horizontalAlignment: Text.AlignHCenter
                     text: modelData
-                    color: modelData === "wk" ? Theme.off : Theme.label
+                    color: Qt.rgba(235 / 255, 243 / 255, 242 / 255, 0.55)
+                    font.pixelSize: Theme.tiny
                 }
             }
+        }
 
-            Repeater {
-                model: 6 * 8
+        Repeater {
+            model: 6
 
-                MouseArea {
-                    id: cell
+            Row {
+                id: week
 
-                    required property int index
-                    readonly property bool isWeek: index % 8 === 0
-                    readonly property var day: Agenda.addDays(root.gridStart, Math.floor(index / 8) * 7 + Math.max(index % 8 - 1, 0))
-                    readonly property bool inMonth: day.getMonth() === root.viewMonth
-                    readonly property bool isToday: root.sameDay(day, root.today)
-                    readonly property bool isSelected: !isWeek && root.sameDay(day, root.selected)
-                    readonly property bool isBusy: !isWeek && Agenda.busy[Agenda.key(day)] === true
+                required property int index
+                readonly property var monday: Agenda.addDays(root.gridStart, index * 7)
 
-                    width: root.cellWidth
-                    height: 26
-                    enabled: !isWeek
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: {
-                        root.selected = day;
-                        if (!inMonth)
-                            root.shift(day < new Date(root.viewYear, root.viewMonth, 1) ? -1 : 1);
-                    }
+                UiText {
+                    width: 26
+                    height: 34
+                    horizontalAlignment: Text.AlignHCenter
+                    text: root.isoWeek(week.monday)
+                    mono: true
+                    color: Qt.rgba(235 / 255, 243 / 255, 242 / 255, 0.42)
+                    font.pixelSize: 10
+                }
 
-                    Rectangle {
-                        anchors.fill: parent
-                        anchors.margins: 1
-                        color: cell.isSelected ? Theme.line : cell.containsMouse ? Theme.hover : "transparent"
-                    }
+                Repeater {
+                    model: 7
 
-                    BarText {
-                        id: number
-                        anchors.centerIn: parent
-                        text: cell.isWeek ? root.isoWeek(cell.day) : cell.day.getDate()
-                        // Days with events are bright and bold; plain days stay regular.
-                        color: cell.isWeek ? Theme.off : cell.isToday ? Theme.accent : !cell.inMonth ? Theme.off : cell.isBusy ? Theme.bright : Theme.text
-                        font.bold: cell.isBusy
-                    }
+                    MouseArea {
+                        id: cell
 
-                    // Today: underlined like the active workspace.
-                    Rectangle {
-                        visible: cell.isToday && !cell.isWeek
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        anchors.bottom: parent.bottom
-                        anchors.bottomMargin: 4
-                        width: number.implicitWidth
-                        height: 1
-                        color: Theme.accent
+                        required property int index
+                        readonly property var day: Agenda.addDays(week.monday, index)
+                        readonly property bool inMonth: day.getMonth() === root.viewMonth
+                        readonly property bool isToday: root.sameDay(day, root.today)
+                        readonly property bool isSelected: root.sameDay(day, root.selected)
+                        readonly property bool isBusy: Agenda.busy[Agenda.key(day)] === true
+
+                        width: monthTile.dayWidth
+                        height: 34
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            root.selected = day;
+                            if (!inMonth)
+                                root.shift(day < new Date(root.viewYear, root.viewMonth, 1) ? -1 : 1);
+                        }
+
+                        // Today is a white disc; the selected day gets a ring.
+                        Rectangle {
+                            anchors.centerIn: parent
+                            width: 34
+                            height: 34
+                            radius: 17
+                            color: cell.isToday ? Theme.white : cell.containsMouse ? Theme.fillHover : "transparent"
+                            border.width: cell.isSelected && !cell.isToday ? 1.5 : 0
+                            border.color: Qt.rgba(1, 1, 1, 0.55)
+                        }
+
+                        UiText {
+                            anchors.centerIn: parent
+                            text: cell.day.getDate()
+                            font.features: {
+                                "tnum": 1
+                            }
+                            color: cell.isToday ? Theme.ink : cell.inMonth ? Theme.text : Qt.rgba(235 / 255, 243 / 255, 242 / 255, 0.32)
+                            // Days with events are bold, with a dot under the number.
+                            font.weight: cell.isToday || cell.isBusy ? Font.DemiBold : Font.Normal
+                        }
+
+                        Rectangle {
+                            visible: cell.isBusy
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            anchors.bottom: parent.bottom
+                            anchors.bottomMargin: 4
+                            width: 4
+                            height: 4
+                            radius: 2
+                            color: cell.isToday ? Theme.ink : Qt.rgba(235 / 255, 243 / 255, 242 / 255, 0.75)
+                        }
                     }
                 }
             }
@@ -208,6 +252,7 @@ Panel {
         MouseArea {
             property real acc: 0
 
+            parent: monthTile
             anchors.fill: parent
             acceptedButtons: Qt.NoButton
             onWheel: wheel => {
@@ -220,99 +265,127 @@ Panel {
         }
     }
 
-    Section {
+    SectionLabel {
+        visible: Agenda.configured
         text: root.dayLabel(root.selected)
     }
 
-    Repeater {
-        model: root.dayEvents
+    ColumnLayout {
+        Layout.fillWidth: true
+        Layout.topMargin: -6
+        spacing: 0
 
-        EventRow {
-            day: root.selected
+        Repeater {
+            model: root.dayEvents
+
+            EventRow {
+                when: root.span(modelData, root.selected)
+            }
+        }
+
+        UiText {
+            visible: root.dayEvents.length === 0 && Agenda.configured && (Agenda.loaded || Agenda.errors.length === 0)
+            Layout.leftMargin: 10
+            Layout.preferredHeight: 34
+            text: Agenda.loaded ? "Nothing planned" : "Loading…"
+            color: Qt.rgba(235 / 255, 243 / 255, 242 / 255, 0.55)
         }
     }
 
-    Note {
-        visible: root.dayEvents.length === 0 && Agenda.configured && (Agenda.loaded || Agenda.errors.length === 0)
-        text: Agenda.loaded ? "nothing" : "loading"
-    }
-
-    Section {
+    SectionLabel {
         visible: root.nextEvents.length > 0
-        text: "upcoming"
+        text: "Upcoming"
     }
 
-    Repeater {
-        model: root.nextEvents
+    ColumnLayout {
+        visible: root.nextEvents.length > 0
+        Layout.fillWidth: true
+        Layout.topMargin: -6
+        spacing: 0
 
-        EventRow {
-            showDate: true
+        Repeater {
+            model: root.nextEvents
+
+            EventRow {
+                when: root.upcomingLabel(modelData)
+            }
         }
     }
 
     footer: [
-        BarText {
+        UiText {
             visible: Agenda.loaded && Agenda.configured
-            text: "updated " + Qt.formatTime(Agenda.updated, "HH:mm")
-            color: Theme.off
+            Layout.leftMargin: 6
+            text: "Updated " + Qt.formatTime(Agenda.updated, "HH:mm")
+            dim: true
+            font.pixelSize: Theme.small
         },
         Item {
             Layout.fillWidth: true
         },
-        Action {
-            visible: !root.onToday
-            text: "today"
-            onClicked: root.goToday()
-        },
-        Action {
-            text: "google calendar →"
+        MouseArea {
+            implicitWidth: gcal.implicitWidth + 20
+            implicitHeight: 30
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
             onClicked: {
                 Quickshell.execDetached(["xdg-open", "https://calendar.google.com/"]);
                 root.close();
             }
+
+            Rectangle {
+                anchors.fill: parent
+                radius: Theme.rowRadius
+                color: parent.containsMouse ? Qt.rgba(1, 1, 1, 0.09) : "transparent"
+            }
+            UiText {
+                id: gcal
+                anchors.centerIn: parent
+                text: "Google Calendar…"
+                color: Qt.rgba(235 / 255, 243 / 255, 242 / 255, 0.8)
+            }
         }
     ]
 
-    // "10:15-12:00  title            calendar", optionally led by "sun 12".
+    // "●  10:15–12:00   title            calendar"
     component EventRow: RowLayout {
         id: row
 
         required property var modelData
-        property var day: modelData.start
-        property bool showDate: false
+        property string when: ""
 
         Layout.fillWidth: true
-        Layout.leftMargin: Theme.panelPadding
-        Layout.rightMargin: Theme.panelPadding
-        Layout.preferredHeight: 24
+        Layout.leftMargin: 10
+        Layout.rightMargin: 10
+        Layout.preferredHeight: 38
         spacing: 12
 
-        BarText {
-            visible: row.showDate
-            Layout.preferredWidth: Math.ceil(digit.advanceWidth * 6)
-            text: root.sameDay(row.modelData.start, root.today) ? "today" : Qt.formatDate(row.modelData.start, "ddd dd").toLowerCase()
-            color: Theme.label
+        Rectangle {
+            implicitWidth: 8
+            implicitHeight: 8
+            radius: 4
+            color: root.colorFor(row.modelData.calendar)
         }
 
-        BarText {
-            Layout.preferredWidth: Math.ceil(digit.advanceWidth * 11)
-            text: root.span(row.modelData, row.day)
-            color: row.modelData.allDay ? Theme.label : Theme.text
+        UiText {
+            Layout.preferredWidth: 92
+            text: row.when
+            mono: true
+            color: Qt.rgba(235 / 255, 243 / 255, 242 / 255, 0.75)
+            font.pixelSize: Theme.small
         }
 
-        BarText {
+        UiText {
             Layout.fillWidth: true
             text: row.modelData.title
-            elide: Text.ElideRight
-            color: Theme.bright
         }
 
-        BarText {
-            visible: Agenda.multiple
-            Layout.maximumWidth: Math.ceil(digit.advanceWidth * 10)
+        UiText {
+            visible: text !== ""
+            Layout.maximumWidth: 90
             text: row.modelData.calendar
-            elide: Text.ElideRight
-            color: Theme.off
+            color: Qt.rgba(235 / 255, 243 / 255, 242 / 255, 0.55)
+            font.pixelSize: Theme.tiny
         }
     }
 }

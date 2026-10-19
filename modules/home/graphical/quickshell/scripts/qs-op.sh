@@ -13,6 +13,7 @@ case "${1:-}" in
         op item list --format json | jq -c '[.[] | {
             id, title, category,
             vault: .vault.id,
+            vaultName: (.vault.name // ""),
             user: (.additional_information // ""),
             urls: ([.urls[]?.href] | join(" "))
         }]'

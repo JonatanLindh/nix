@@ -8,6 +8,8 @@ Panel {
     id: root
 
     property bool adding: false
+    // The only ports funnel allows.
+    readonly property var ports: ["443", "8443", "10000"]
     property string newPort: "443"
     // Public is always an explicit choice.
     property bool newPublic: false
@@ -19,10 +21,10 @@ Panel {
         newPublic = false;
         targetInput.text = "";
         pathInput.text = "";
-        targetInput.forceActiveFocus();
+        targetInput.input.forceActiveFocus();
     }
 
-    // Value most recently copied; its row shows "copied" for a moment.
+    // Value most recently copied; its row shows "Copied" for a moment.
     property string copied: ""
 
     function copy(text) {
@@ -52,8 +54,11 @@ Panel {
         adding = false;
     }
 
+    readonly property color faint: Qt.rgba(235 / 255, 243 / 255, 242 / 255, 0.6)
+
     name: "ts"
-    title: "ts"
+    title: "Tailscale"
+    backTo: "net"
 
     onVisibleChanged: {
         Ts.watching = visible;
@@ -62,242 +67,361 @@ Panel {
             Ts.refresh();
         } else {
             adding = false;
+            exit.open = false;
         }
     }
 
-    actions: Toggle {
+    actions: Switch {
+        visible: Ts.available
         checked: Ts.up
         onToggled: Ts.setUp(!Ts.up)
     }
 
-    Note {
+    UiText {
         visible: Ts.error !== ""
-        Layout.topMargin: 12
+        Layout.fillWidth: true
+        Layout.leftMargin: 6
+        Layout.rightMargin: 6
         text: Ts.error
-        color: Theme.warn
+        color: Theme.warnText
+        font.pixelSize: Theme.small
+        wrapMode: Text.Wrap
     }
 
-    Note {
-        visible: Ts.backend !== "" && !Ts.up
-        Layout.topMargin: 12
-        text: Ts.backend === "NeedsLogin" ? "needs login: run `tailscale up`" : "tailscale is " + Ts.backend.toLowerCase()
-    }
+    // This device.
+    Tile {
+        visible: Ts.up && Ts.self !== null
 
-    Section {
-        text: "this device"
-    }
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 12
 
-    PanelRow {
-        text: Ts.self?.name ?? ""
-        detail: root.copied !== "" && root.copied === Ts.self?.ip ? "copied" : Ts.self?.ip ?? ""
-        detailColor: detail === "copied" ? Theme.accent : Theme.label
-        selected: Ts.up
-        onClicked: root.copy(Ts.self?.ip ?? "")
-    }
+            Rectangle {
+                implicitWidth: 34
+                implicitHeight: 34
+                radius: 17
+                color: Theme.accent
 
-    Section {
-        visible: Ts.up && Ts.exitOptions.length > 0
-        text: "exit node"
-    }
+                Icon {
+                    anchors.centerIn: parent
+                    name: "tailscale"
+                    size: 17
+                    color: Theme.accentInk
+                }
+            }
+            ColumnLayout {
+                Layout.fillWidth: true
+                spacing: 2
 
-    PanelRow {
-        visible: Ts.up && Ts.exitOptions.length > 0
-        text: "none"
-        selected: Ts.exitNode === null
-        onClicked: Ts.setExitNode(null)
-    }
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 4
 
-    Repeater {
-        model: Ts.up ? Ts.exitOptions : []
-
-        PanelRow {
-            required property var modelData
-            text: modelData.name
-            detail: modelData.online ? "" : "offline"
-            selected: modelData.exitActive
-            dimmed: !modelData.online
-            onClicked: Ts.setExitNode(modelData)
+                    UiText {
+                        Layout.fillWidth: true
+                        Layout.maximumWidth: implicitWidth
+                        text: Ts.self?.name ?? ""
+                        font.weight: Font.DemiBold
+                    }
+                    UiText {
+                        Layout.fillWidth: true
+                        text: "· this device"
+                        color: root.faint
+                        font.pixelSize: Theme.small
+                    }
+                }
+                UiText {
+                    Layout.fillWidth: true
+                    text: root.copied !== "" && root.copied === Ts.self?.ip ? "Copied" : Ts.self?.ip ?? ""
+                    mono: true
+                    color: text === "Copied" ? Theme.accent : Qt.rgba(235 / 255, 243 / 255, 242 / 255, 0.75)
+                    font.pixelSize: Theme.small
+                }
+            }
+            CircleButton {
+                icon: root.copied !== "" && root.copied === Ts.self?.ip ? "check" : "copy"
+                onClicked: root.copy(Ts.self?.ip ?? "")
+            }
         }
     }
 
-    Section {
-        visible: Ts.up
-        text: "serve"
+    SectionLabel {
+        visible: Ts.up && Ts.exitOptions.length > 0
+        text: "Exit node"
+    }
 
-        Action {
-            text: root.adding ? "cancel" : "+ add"
+    Dropdown {
+        id: exit
+        visible: Ts.up && Ts.exitOptions.length > 0
+        Layout.topMargin: -4
+        model: [
+            {
+                text: "None",
+                note: "Direct"
+            }
+        ].concat(Ts.exitOptions.map(p => ({
+                    text: p.name,
+                    note: p.online ? "Online" : "Offline",
+                    disabled: !p.online
+                })))
+        currentIndex: Ts.exitOptions.findIndex(p => p.exitActive) + 1
+        sublabel: Ts.exitNode ? "Routing all traffic" : ""
+        onActivated: i => Ts.setExitNode(i === 0 ? null : Ts.exitOptions[i - 1])
+    }
+
+    SectionLabel {
+        visible: Ts.up
+        text: "Serving"
+
+        PillButton {
+            pillHeight: 24
+            text: root.adding ? "Cancel" : "+ Add"
+            checked: root.adding
             onClicked: root.adding = !root.adding
         }
     }
 
-    Repeater {
-        model: Ts.up ? Ts.serves : []
-
-        PanelRow {
-            id: entry
-
-            required property var modelData
-            text: ":" + modelData.port + modelData.path + " → " + root.shortTarget(modelData.target)
-            detail: root.copied === modelData.url ? "copied" : ""
-            detailColor: Theme.accent
-            selected: true
-            // Click copies the public/tailnet URL.
-            onClicked: root.copy(modelData.url)
-
-            Action {
-                text: entry.modelData.funnel ? "public" : "tailnet"
-                onClicked: Ts.setPublic(entry.modelData, !entry.modelData.funnel)
-
-                BarText {
-                    // Accent the word when the entry is on the public internet.
-                    anchors.fill: parent
-                    visible: entry.modelData.funnel
-                    text: parent.text
-                    color: Theme.accent
-                }
-            }
-
-            Action {
-                text: "remove"
-                onClicked: Ts.removeServe(entry.modelData)
-            }
-        }
-    }
-
-    Note {
-        visible: Ts.up && Ts.serves.length === 0 && !root.adding
-        text: "nothing served"
-    }
-
-    // New serve/funnel entry.
     ColumnLayout {
-        visible: Ts.up && root.adding
+        visible: Ts.up && Ts.serves.length > 0
         Layout.fillWidth: true
-        Layout.leftMargin: Theme.panelPadding
-        Layout.rightMargin: Theme.panelPadding
-        Layout.topMargin: 6
-        spacing: 10
+        Layout.topMargin: -4
+        spacing: 2
 
-        RowLayout {
-            spacing: 12
+        Repeater {
+            model: Ts.up ? Ts.serves : []
 
-            BarText {
-                Layout.preferredWidth: 40
-                text: "port"
-                color: Theme.label
-            }
+            // Click copies the public/tailnet URL.
+            MouseArea {
+                id: entry
 
-            Repeater {
-                // The only ports funnel allows.
-                model: ["443", "8443", "10000"]
+                required property var modelData
 
-                MouseArea {
-                    required property string modelData
-                    implicitWidth: portLabel.implicitWidth
-                    implicitHeight: portLabel.implicitHeight
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: root.newPort = modelData
+                Layout.fillWidth: true
+                implicitHeight: 40
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: root.copy(modelData.url)
 
-                    BarText {
-                        id: portLabel
-                        text: parent.modelData
-                        color: root.newPort === parent.modelData ? Theme.accent : Theme.text
-                        font.underline: root.newPort === parent.modelData
+                Rectangle {
+                    anchors.fill: parent
+                    radius: Theme.rowRadius
+                    color: entry.containsMouse ? Qt.rgba(1, 1, 1, 0.09) : "transparent"
+                }
+
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.leftMargin: 10
+                    anchors.rightMargin: 8
+                    spacing: 8
+
+                    UiText {
+                        Layout.fillWidth: true
+                        textFormat: Text.StyledText
+                        text: root.copied === entry.modelData.url ? `<font color="${Theme.accent}">Copied</font>` : ":" + entry.modelData.port + (entry.modelData.path === "/" ? "" : entry.modelData.path) + ` <font color="${Qt.rgba(235 / 255, 243 / 255, 242 / 255, 0.5)}">→</font> ` + root.shortTarget(entry.modelData.target)
+                        mono: true
+                        font.pixelSize: Theme.small
+                    }
+
+                    // Who can reach it; click flips between tailnet and public (funnel).
+                    MouseArea {
+                        id: who
+                        implicitWidth: whoText.implicitWidth + 18
+                        implicitHeight: 22
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: Ts.setPublic(entry.modelData, !entry.modelData.funnel)
+
+                        Rectangle {
+                            anchors.fill: parent
+                            radius: height / 2
+                            color: entry.modelData.funnel ? Qt.alpha(Theme.mic, who.containsMouse ? 0.38 : 0.28) : who.containsMouse ? Theme.fillActive : Theme.fillHover
+                        }
+                        UiText {
+                            id: whoText
+                            anchors.centerIn: parent
+                            text: entry.modelData.funnel ? "Public" : "Tailnet"
+                            color: entry.modelData.funnel ? "#ffc58a" : Theme.text
+                            font.pixelSize: Theme.tiny
+                            font.weight: Font.Medium
+                        }
+                    }
+
+                    CircleButton {
+                        size: 24
+                        iconSize: 12
+                        icon: "close"
+                        onClicked: Ts.removeServe(entry.modelData)
                     }
                 }
             }
         }
+    }
 
-        RowLayout {
-            spacing: 12
+    UiText {
+        visible: Ts.up && Ts.serves.length === 0 && !root.adding
+        Layout.leftMargin: 10
+        Layout.topMargin: -4
+        text: "Nothing served"
+        faint: true
+        font.pixelSize: Theme.small
+    }
 
-            BarText {
-                Layout.preferredWidth: 40
-                text: "to"
-                color: Theme.label
+    // New serve/funnel entry.
+    Tile {
+        visible: Ts.up && root.adding
+
+        GridLayout {
+            Layout.fillWidth: true
+            columns: 2
+            columnSpacing: 12
+            rowSpacing: 8
+
+            UiText {
+                text: "Port"
+                dim: true
+                font.pixelSize: Theme.small
+            }
+            Segmented {
+                implicitHeight: 32
+                model: root.ports
+                currentIndex: root.ports.indexOf(root.newPort)
+                onActivated: i => root.newPort = root.ports[i]
             }
 
-            Input {
+            UiText {
+                text: "To"
+                dim: true
+                font.pixelSize: Theme.small
+            }
+            GlassField {
                 id: targetInput
-                Layout.fillWidth: true
                 placeholder: "3000, localhost:8080, /some/dir"
                 onAccepted: root.submit()
             }
-        }
 
-        RowLayout {
-            spacing: 12
-
-            BarText {
-                Layout.preferredWidth: 40
-                text: "path"
-                color: Theme.label
+            UiText {
+                text: "Path"
+                dim: true
+                font.pixelSize: Theme.small
             }
-
-            Input {
+            GlassField {
                 id: pathInput
-                Layout.fillWidth: true
                 placeholder: "/"
                 onAccepted: root.submit()
             }
-        }
 
-        RowLayout {
-            spacing: 12
-
-            BarText {
-                Layout.preferredWidth: 40
-                text: "who"
-                color: Theme.label
+            UiText {
+                text: "Who"
+                dim: true
+                font.pixelSize: Theme.small
             }
-
-            Toggle {
-                checked: root.newPublic
-                onText: "public"
-                offText: "tailnet"
-                onToggled: root.newPublic = !root.newPublic
-            }
-
-            Item {
+            RowLayout {
                 Layout.fillWidth: true
-            }
+                spacing: 8
 
-            Action {
-                text: "add →"
-                onClicked: root.submit()
+                Segmented {
+                    implicitHeight: 32
+                    model: ["Tailnet", "Public"]
+                    currentIndex: root.newPublic ? 1 : 0
+                    onActivated: i => root.newPublic = i === 1
+                }
+                PillButton {
+                    pillHeight: 32
+                    accent: true
+                    icon: "check"
+                    text: "Add"
+                    onClicked: root.submit()
+                }
             }
         }
     }
 
-    Section {
+    SectionLabel {
         visible: Ts.up && Ts.peers.length > 0
-        text: "peers"
+        text: "Devices"
     }
 
-    Repeater {
-        model: Ts.up ? Ts.peers.slice(0, 8) : []
+    ColumnLayout {
+        visible: Ts.up && Ts.peers.length > 0
+        Layout.fillWidth: true
+        Layout.topMargin: -4
+        spacing: 2
 
-        PanelRow {
-            required property var modelData
-            text: modelData.name
-            detail: root.copied === modelData.dns ? "copied" : modelData.online ? modelData.ip : modelData.os
-            detailColor: root.copied === modelData.dns ? Theme.accent : Theme.label
-            dimmed: !modelData.online
+        Repeater {
+            model: Ts.up ? Ts.peers.slice(0, 8) : []
+
             // Click copies the MagicDNS name.
-            onClicked: root.copy(modelData.dns)
-        }
-    }
+            MouseArea {
+                id: peer
 
-    footer: [
-        Item {
-            Layout.fillWidth: true
-        },
-        Action {
-            text: "admin →"
-            onClicked: {
-                Quickshell.execDetached(["xdg-open", "https://login.tailscale.com/admin/machines"]);
-                root.close();
+                required property var modelData
+
+                Layout.fillWidth: true
+                implicitHeight: 40
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: root.copy(modelData.dns)
+
+                Rectangle {
+                    anchors.fill: parent
+                    radius: Theme.rowRadius
+                    color: peer.containsMouse ? Qt.rgba(1, 1, 1, 0.09) : "transparent"
+                }
+
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.leftMargin: 10
+                    anchors.rightMargin: 10
+                    spacing: 12
+
+                    Rectangle {
+                        implicitWidth: 8
+                        implicitHeight: 8
+                        radius: 4
+                        color: peer.modelData.online ? Theme.online : Qt.rgba(235 / 255, 243 / 255, 242 / 255, 0.3)
+                    }
+                    UiText {
+                        Layout.fillWidth: true
+                        text: peer.modelData.name
+                        color: peer.modelData.online ? Theme.text : Qt.rgba(235 / 255, 243 / 255, 242 / 255, 0.55)
+                    }
+                    UiText {
+                        readonly property bool done: root.copied === peer.modelData.dns
+                        text: done ? "Copied" : peer.modelData.online ? peer.modelData.ip : "offline"
+                        mono: !done
+                        color: done ? Theme.accent : root.faint
+                        font.pixelSize: Theme.small
+                    }
+                }
             }
         }
-    ]
+    }
+
+    UiText {
+        visible: !Ts.up
+        Layout.fillWidth: true
+        Layout.topMargin: 18
+        Layout.bottomMargin: 18
+        horizontalAlignment: Text.AlignHCenter
+        wrapMode: Text.Wrap
+        text: !Ts.available ? "Tailscale isn't running" : Ts.backend === "NeedsLogin" ? "Needs login: run `tailscale up`" : Ts.backend === "Stopped" || Ts.backend === "" ? "Tailscale is stopped" : "Tailscale is " + Ts.backend.toLowerCase()
+        dim: true
+    }
+
+    footer: ListRow {
+        implicitHeight: 34
+        text: "Admin console…"
+        onClicked: {
+            Quickshell.execDetached(["xdg-open", "https://login.tailscale.com/admin/machines"]);
+            root.close();
+        }
+
+        Icon {
+            anchors.verticalCenter: parent.verticalCenter
+            name: "chevron-right"
+            size: 14
+            strokeWidth: 2
+            color: Theme.textDim
+        }
+    }
 }

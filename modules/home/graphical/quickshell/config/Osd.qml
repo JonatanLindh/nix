@@ -1,12 +1,13 @@
 pragma ComponentBehavior: Bound
 import qs
 import QtQuick
+import QtQuick.Layouts
 import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Wayland
 
-// "vol  64  ▮▮▮▮▮▯▯▯" at the bottom of the focused monitor for a moment after the volume,
-// mute or brightness changes. Only reacts to changes of a value it has already seen, so
+// A glass pill (icon, 5% steps, number) at the bottom of the focused monitor for a moment
+// after the volume, mute or brightness changes. Only reacts to changes of a value it has already seen, so
 // startup, reloads and switching the output device stay quiet. Takes no input at all.
 // qmllint disable uncreatable-type
 PanelWindow {
@@ -22,7 +23,6 @@ PanelWindow {
 
     readonly property bool mute: kind === "vol" && Audio.muted
     readonly property int percent: kind === "vol" ? Audio.volume : Brightness.percent
-    readonly property int cells: 25
 
     function show(what) {
         if (!armed)
@@ -106,60 +106,41 @@ PanelWindow {
         onTriggered: root.shown = false
     }
 
-    Rectangle {
+    Glass {
         id: box
 
-        implicitWidth: row.implicitWidth + 2 * Theme.panelPadding
-        implicitHeight: row.implicitHeight + 24
-        color: Theme.barBg
-        border.width: 1
-        border.color: Theme.border
+        implicitWidth: 380
+        implicitHeight: 58
+        radius: height / 2
 
-        Row {
-            id: row
+        RowLayout {
+            anchors.fill: parent
+            anchors.leftMargin: 18
+            anchors.rightMargin: 20
+            spacing: 14
 
-            readonly property int filled: Math.round(Math.max(0, Math.min(1, root.percent / 100)) * root.cells)
-
-            anchors.centerIn: parent
-            spacing: 12
-
-            BarText {
-                text: root.kind
-                color: Theme.label
+            Icon {
+                name: root.mute ? "volume-mute" : root.kind === "vol" ? "volume" : "sun"
+                size: 20
+                strokeWidth: 2
+                color: root.mute ? Theme.textDim : Theme.text
             }
 
-            // Fixed width so the box doesn't change size with the number.
-            BarText {
-                width: Math.ceil(cell.advanceWidth * 4)
+            StepMeter {
+                Layout.fillWidth: true
+                value: Math.max(0, Math.min(1, root.percent / 100))
+                muted: root.mute
+            }
+
+            // Fixed width so the meter doesn't change length with the number.
+            UiText {
+                Layout.preferredWidth: 48
                 horizontalAlignment: Text.AlignRight
-                text: root.mute ? "mute" : `${root.percent}`
-                color: root.mute ? Theme.off : Theme.bright
+                text: root.mute ? "Muted" : `${root.percent}`
+                tabular: true
+                color: root.mute ? Theme.textDim : Theme.text
+                font.weight: Font.Medium
             }
-
-            // Cells drawn as rectangles rather than "█" glyphs, like Meter.
-            Row {
-                anchors.verticalCenter: parent.verticalCenter
-                spacing: 2
-
-                Repeater {
-                    model: root.cells
-
-                    Rectangle {
-                        required property int index
-
-                        width: cell.advanceWidth - 1
-                        height: Theme.fontSize
-                        color: index >= row.filled ? Theme.track : root.mute ? Theme.off : Theme.accent
-                    }
-                }
-            }
-        }
-
-        TextMetrics {
-            id: cell
-            font.family: Theme.font
-            font.pixelSize: Theme.fontSize
-            text: "0"
         }
     }
 }

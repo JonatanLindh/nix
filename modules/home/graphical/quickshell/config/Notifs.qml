@@ -9,7 +9,8 @@ import Quickshell.Services.Notifications
 // (NotifCenter) and stays tracked there, so its actions still work, until it's removed.
 //
 // Entries are plain data so they survive the notification closing and config reloads:
-// { id, time, app, summary, body, critical, actions: [{ id, text }], hasDefault, resident, transient, held }
+// { id, time, app, summary, body, critical, actions: [{ id, text }], hasDefault, resident, transient, held,
+//   icon (app icon: theme name, path or url), image (the notification's picture, a url) }
 Singleton {
     id: root
 
@@ -73,7 +74,9 @@ Singleton {
             actions: actions.filter(a => a.id !== "default"),
             hasDefault: actions.some(a => a.id === "default"),
             resident: n.resident,
-            transient: n.transient
+            transient: n.transient,
+            icon: n.appIcon || (n.desktopEntry ? DesktopEntries.byId(n.desktopEntry)?.icon ?? "" : ""),
+            image: n.image
         };
     }
 
@@ -172,7 +175,7 @@ Singleton {
         bodyImagesSupported: false
         actionsSupported: true
         actionIconsSupported: false
-        imageSupported: false
+        imageSupported: true
         inlineReplySupported: false
 
         onNotification: n => {

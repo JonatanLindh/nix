@@ -40,7 +40,7 @@ PanelWindow {
     margins.right: 8
     // qmllint enable unqualified unresolved-type
     exclusionMode: ExclusionMode.Ignore
-    implicitWidth: 460
+    implicitWidth: 380
     // Fixed height: resizing the layer surface on every keystroke makes it jitter (Hyprland
     // animates layer geometry). The frame sizes itself inside; input only reaches the frame.
     implicitHeight: 680
@@ -96,7 +96,7 @@ PanelWindow {
         anchors.left: parent.left
         anchors.right: parent.right
         height: implicitHeight
-        title: "notifications"
+        title: "Notifications"
         onDismissed: root.close()
 
         Keys.onPressed: event => {
@@ -116,17 +116,33 @@ PanelWindow {
         }
 
         actions: [
-            BarText {
-                text: "dnd"
-                color: Theme.label
+            Row {
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 6
+
+                Icon {
+                    anchors.verticalCenter: parent.verticalCenter
+                    name: "moon"
+                    size: 14
+                    color: Theme.textDim
+                }
+                UiText {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "DND"
+                    dim: true
+                    font.pixelSize: Theme.small
+                }
             },
-            Toggle {
+            Switch {
+                anchors.verticalCenter: parent.verticalCenter
                 checked: Notifs.dnd
+                checkedColor: Theme.screen
                 onToggled: Notifs.dnd = !Notifs.dnd
             },
-            Action {
+            PillButton {
+                anchors.verticalCenter: parent.verticalCenter
                 visible: Notifs.history.length > 0
-                text: "clear"
+                text: "Clear"
                 onClicked: Notifs.clear()
             }
         ]
@@ -135,9 +151,10 @@ PanelWindow {
             id: list
 
             Layout.fillWidth: true
-            Layout.topMargin: 8
-            Layout.preferredHeight: Math.min(contentHeight, 480)
+            Layout.preferredHeight: Math.min(contentHeight, 540)
+            visible: count > 0
             clip: true
+            spacing: 8
             model: Notifs.history
             boundsBehavior: Flickable.StopAtBounds
             highlightMoveDuration: 0
@@ -149,96 +166,100 @@ PanelWindow {
                 required property int index
                 readonly property bool current: ListView.isCurrentItem
                 readonly property bool live: Notifs.isLive(modelData.id)
+                readonly property var when: new Date(modelData.time)
 
                 width: list.width
-                height: 50
+                height: card.implicitHeight + 24
                 hoverEnabled: true
                 cursorShape: live && modelData.hasDefault ? Qt.PointingHandCursor : Qt.ArrowCursor
                 onEntered: list.currentIndex = index
                 onClicked: root.activate(modelData)
 
+                // The selected card (hovered or picked with the arrows) is a step lighter.
                 Rectangle {
                     anchors.fill: parent
-                    color: row.current ? Theme.hover : "transparent"
+                    radius: Theme.tileRadius
+                    color: row.current ? Theme.fillHover : Theme.fill
+                    border.width: row.modelData.critical ? 1 : 0
+                    border.color: Qt.alpha(Theme.warn, 0.5)
                 }
 
-                RowLayout {
-                    anchors.fill: parent
-                    anchors.leftMargin: Theme.panelPadding
-                    anchors.rightMargin: Theme.panelPadding
-                    spacing: 8
+                NotifCard {
+                    id: card
 
-                    BarText {
-                        Layout.preferredWidth: 8
-                        Layout.alignment: Qt.AlignTop
-                        Layout.topMargin: 8
-                        text: row.current ? ">" : ""
-                        color: Theme.accent
-                    }
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.margins: 12
+                    entry: row.modelData
+                    // Older than today: the day too.
+                    time: new Date().toDateString() === row.when.toDateString() ? Qt.formatTime(row.when, "HH:mm") : Qt.formatDateTime(row.when, "ddd HH:mm")
+                    headerInset: row.current ? 22 : 0
+                }
 
-                    ColumnLayout {
-                        Layout.fillWidth: true
-                        spacing: 4
-
-                        RowLayout {
-                            Layout.fillWidth: true
-                            spacing: 8
-
-                            BarText {
-                                text: Qt.formatTime(new Date(row.modelData.time), "hh:mm")
-                                color: Theme.off
-                            }
-
-                            BarText {
-                                Layout.fillWidth: true
-                                text: row.modelData.app
-                                elide: Text.ElideRight
-                                color: row.modelData.critical ? Theme.warn : Theme.label
-                            }
-
-                            Action {
-                                visible: row.containsMouse
-                                text: "×"
-                                onClicked: Notifs.remove(row.modelData.id)
-                            }
-                        }
-
-                        RowLayout {
-                            Layout.fillWidth: true
-                            spacing: 8
-
-                            BarText {
-                                Layout.maximumWidth: list.width * 0.6
-                                visible: text !== ""
-                                text: row.modelData.summary.replace(/\s+/g, " ")
-                                elide: Text.ElideRight
-                                color: row.current ? Theme.bright : Theme.text
-                            }
-
-                            BarText {
-                                Layout.fillWidth: true
-                                text: row.modelData.body.replace(/\s+/g, " ")
-                                elide: Text.ElideRight
-                                color: Theme.label
-                            }
-                        }
-                    }
+                CircleButton {
+                    visible: row.current
+                    anchors.top: parent.top
+                    anchors.right: parent.right
+                    anchors.margins: 8
+                    size: 22
+                    icon: "close"
+                    iconSize: 12
+                    restColor: Theme.fillHover
+                    onClicked: Notifs.remove(row.modelData.id)
                 }
             }
         }
 
-        Note {
+        // Centred with anchors: inside the frame's layout a nested ColumnLayout kept its
+        // implicit width and sat off to the left.
+        Item {
             visible: Notifs.history.length === 0
-            Layout.topMargin: 14
-            text: Notifs.dnd ? "nothing yet · do not disturb is on" : "no notifications"
+            Layout.fillWidth: true
+            implicitHeight: empty.implicitHeight + 60
+
+            Column {
+                id: empty
+                anchors.centerIn: parent
+                spacing: 10
+
+                Icon {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    name: "bell"
+                    size: 28
+                    strokeWidth: 1.6
+                    color: Theme.textDim
+                }
+                UiText {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: Notifs.dnd ? "No notifications · Do not disturb is on" : "No notifications"
+                    dim: true
+                }
+            }
         }
 
         footer: [
-            BarText {
+            Item {
                 Layout.fillWidth: true
-                text: "enter opens · del removes · esc closes"
-                elide: Text.ElideRight
-                color: Theme.off
+            },
+            Row {
+                spacing: 16
+
+                KeyHint {
+                    keys: ["↵"]
+                    text: "Open"
+                }
+                KeyHint {
+                    keys: ["del"]
+                    text: "Remove"
+                }
+                KeyHint {
+                    keys: ["esc"]
+                    text: "Close"
+                }
+            },
+            Item {
+                Layout.fillWidth: true
             }
         ]
     }

@@ -32,8 +32,9 @@ hl.config({
         gaps_out         = 5,
         border_size      = 2,
         col              = {
-            active_border   = { colors = { "rgba(33ccffee)", "rgba(00ff99ee)" }, angle = 45 },
-            inactive_border = "rgba(595959aa)",
+            -- Quiet, matching the Quickshell glass: a soft white line, inactive barely there.
+            active_border   = "rgba(ffffff59)",
+            inactive_border = "rgba(ffffff14)",
         },
         resize_on_border = false,
         allow_tearing    = false,
@@ -162,17 +163,14 @@ hl.window_rule({
 })
 
 -- Layer rules
+-- Every Quickshell surface (bar, panels, launcher, OSD, popups) is translucent glass.
+-- ignore_alpha keeps the blur inside the rounded corners instead of a square behind them.
 hl.layer_rule({
-    name        = "bar-blur",
-    match       = { namespace = "quickshell:bar" },
-    blur        = true,
-    blur_popups = true, -- the bar's drop-down panels
-})
-
-hl.layer_rule({
-    name        = "launcher-blur",
-    match       = { namespace = "quickshell:launcher" },
-    blur        = true,
+    name         = "quickshell-blur",
+    match        = { namespace = "^quickshell:.*" },
+    blur         = true,
+    blur_popups  = true, -- the bar's drop-down panels
+    ignore_alpha = 0.2,
 })
 
 -- Input devices
@@ -207,10 +205,11 @@ hl.bind("SUPER + L", function()
     hl.workspace_rule({ workspace = ws.name, layout = next_layout })
     Debug("Layout (" .. ws.name .. "): " .. next_layout)
 end)
-hl.bind("SUPER + M", hl.dsp.global("quickshell:session"))    -- session menu (quickshell)
-hl.bind("SUPER + V", hl.dsp.global("quickshell:clip"))       -- clipboard history (quickshell)
-hl.bind("SUPER + N", hl.dsp.global("quickshell:notif"))      -- notification history (quickshell)
-hl.bind("SUPER + SHIFT + P", hl.dsp.global("quickshell:op")) -- 1password (quickshell)
+hl.bind("SUPER + M", hl.dsp.global("quickshell:session"))        -- session menu (quickshell)
+hl.bind("SUPER + V", hl.dsp.global("quickshell:clip"))           -- clipboard history (quickshell)
+hl.bind("SUPER + N", hl.dsp.global("quickshell:notif"))          -- notification history (quickshell)
+hl.bind("SUPER + SHIFT + P", hl.dsp.global("quickshell:op"))     -- 1password (quickshell)
+hl.bind("SUPER + SHIFT + C", hl.dsp.global("quickshell:picker")) -- colour picker (quickshell)
 
 hl.bind("SUPER + left", hl.dsp.focus({ direction = "left" }))
 hl.bind("SUPER + right", hl.dsp.focus({ direction = "right" }))
@@ -250,6 +249,6 @@ hl.bind("XF86AudioPause", hl.dsp.exec_cmd(Launch "playerctl play-pause"), { lock
 hl.bind("XF86AudioPlay", hl.dsp.exec_cmd(Launch "playerctl play-pause"), { locked = true })
 hl.bind("XF86AudioPrev", hl.dsp.exec_cmd(Launch "playerctl previous"), { locked = true })
 
-hl.bind("SUPER + PRINT", hl.dsp.exec_cmd(Launch "hyprshot -m window"))
-hl.bind("PRINT", hl.dsp.exec_cmd(Launch "hyprshot -m output"))
-hl.bind("SUPER + SHIFT + PRINT", hl.dsp.exec_cmd(Launch "hyprshot -m region"))
+hl.bind("PRINT", hl.dsp.global("quickshell:screenshot"))                        -- capture overlay, selection (quickshell)
+hl.bind("SUPER + PRINT", hl.dsp.global("quickshell:screenshot-window"))         -- capture overlay, window mode
+hl.bind("SUPER + SHIFT + PRINT", hl.dsp.global("quickshell:screenshot-screen")) -- capture overlay, screen mode

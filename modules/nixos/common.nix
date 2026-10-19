@@ -160,6 +160,7 @@
       corefonts
       vista-fonts
       inter
+      geist-font # the Quickshell bar (Geist + Geist Mono)
       nerd-fonts.symbols-only
       nerd-fonts.fira-code
       nerd-fonts.jetbrains-mono

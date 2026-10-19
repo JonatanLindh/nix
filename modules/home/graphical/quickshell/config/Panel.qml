@@ -3,24 +3,29 @@ import QtQuick
 import Quickshell
 import Quickshell.Hyprland
 
-// Drop-down hanging under the right end of the bar. One open at a time per bar.
+// Drop-down glass panel hanging under the bar. One open at a time per bar.
+// side: "right" (under the status icons), "center" (under the clock) or "left".
+// backTo: a panel this one can be opened from (e.g. "net"); while it was, the header
+// shows a back arrow that returns there.
 PopupWindow {
     id: root
 
     required property var bar
     required property string name
     property alias title: frame.title
-    // Hang under the middle of the bar instead of its right end.
-    property bool centered: false
+    property string side: "right"
+    property int sideMargin: 8
     property int panelWidth: Theme.panelWidth
+    property string backTo: ""
     default property alias content: frame.content
     property alias actions: frame.actions
     property alias footer: frame.footer
+    property alias spacing: frame.spacing
 
     visible: bar.panel === name
     anchor.window: bar
-    anchor.rect.x: centered ? Math.round((bar.width - implicitWidth) / 2) : bar.width - implicitWidth - 8
-    anchor.rect.y: bar.height + 4
+    anchor.rect.x: side === "center" ? Math.round((bar.width - implicitWidth) / 2) : side === "left" ? sideMargin : bar.width - implicitWidth - sideMargin
+    anchor.rect.y: bar.height + Theme.panelGap
     implicitWidth: panelWidth
     implicitHeight: frame.implicitHeight
     color: "transparent"
@@ -53,6 +58,8 @@ PopupWindow {
     PanelFrame {
         id: frame
         anchors.fill: parent
+        showBack: root.backTo !== "" && (root.bar.panelFrom ?? "") === root.backTo
         onDismissed: root.close()
+        onBack: root.bar.open(root.backTo)
     }
 }

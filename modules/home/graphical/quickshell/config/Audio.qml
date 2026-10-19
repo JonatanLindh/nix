@@ -74,37 +74,85 @@ Singleton {
     property var eePresets: []
     property string eePreset: ""
 
+    // Clicks only record the wanted state; commands go out one at a time, absolute (bypass
+    // on/off, load X) rather than "toggle", so quick repeat clicks collapse into the last
+    // state asked for instead of replaying after the CLI catches up.
+    property var eeQueue: ({})
+    // Bumped per command; a bypass status read that started before one is stale.
+    property int eeGeneration: 0
+    property int eeQueryGeneration: 0
+
     function eeToggle() {
         eeBypass = !eeBypass;
-        eeCommand.command = eeCli(["--bypass-toggle"]);
-        eeCommand.running = true;
+        eeSet({
+            bypass: eeBypass
+        });
     }
 
     function eeLoad(name) {
         eePreset = name;
-        eeCommand.command = eeCli(["-l", name]);
+        eeSet({
+            preset: name
+        });
+    }
+
+    function eeSet(change) {
+        eeQueue = Object.assign({}, eeQueue, change);
+        eeFlush();
+    }
+
+    function eeFlush() {
+        if (eeCommand.running)
+            return;
+        const q = Object.assign({}, eeQueue);
+        if (q.preset !== undefined) {
+            eeCommand.command = eeCli(["-l", q.preset]);
+            delete q.preset;
+        } else if (q.bypass !== undefined) {
+            // easyeffects -b: 1 enables bypass, 2 disables it.
+            eeCommand.command = eeCli(["-b", q.bypass ? "1" : "2"]);
+            delete q.bypass;
+        } else {
+            return;
+        }
+        eeQueue = q;
+        eeGeneration++;
         eeCommand.running = true;
+    }
+
+    function eeQueryBypass() {
+        eeQueryGeneration = eeGeneration;
+        eeBypassQuery.running = true;
     }
 
     function eeRefresh() {
         if (!eeRunning)
             return;
-        eeBypassQuery.running = true;
+        eeQueryBypass();
         eePresetsQuery.running = true;
+        eeQueryGeneration = eeGeneration;
         eeLastQuery.running = true;
     }
 
     Process {
         id: eeCommand
-        onRunningChanged: if (!running)
-            root.eeRefresh()
+        onRunningChanged: {
+            if (running)
+                return;
+            if (Object.keys(root.eeQueue).length > 0)
+                root.eeFlush();
+            else
+                root.eeRefresh();
+        }
     }
 
     Process {
         id: eeBypassQuery
         command: root.eeCli(["-b", "3"])
         stdout: StdioCollector {
-            onStreamFinished: root.eeBypass = text.trim() === "1"
+            // Ignore answers that predate a command or arrive while one is still pending.
+            onStreamFinished: if (root.eeQueryGeneration === root.eeGeneration && !eeCommand.running && Object.keys(root.eeQueue).length === 0)
+                root.eeBypass = text.trim() === "1"
         }
     }
 
@@ -124,7 +172,10 @@ Singleton {
         id: eeLastQuery
         command: root.eeCli(["-s"])
         stdout: StdioCollector {
-            onStreamFinished: root.eePreset = (text.match(/output:\s*(.*)/)?.[1] ?? "").trim()
+            // Same guard as the bypass read: a quick run of preset picks shouldn't flick back
+            // through the older ones as their reads come in.
+            onStreamFinished: if (root.eeQueryGeneration === root.eeGeneration && !eeCommand.running && Object.keys(root.eeQueue).length === 0)
+                root.eePreset = (text.match(/output:\s*(.*)/)?.[1] ?? "").trim()
         }
     }
 
@@ -134,7 +185,7 @@ Singleton {
         running: root.eeRunning
         repeat: true
         triggeredOnStart: true
-        onTriggered: eeBypassQuery.running = true
+        onTriggered: root.eeQueryBypass()
     }
 
     onEeRunningChanged: eeRefresh()

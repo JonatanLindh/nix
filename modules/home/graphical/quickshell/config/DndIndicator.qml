@@ -1,27 +1,36 @@
 import qs
 import QtQuick
 
-// "dnd" in the bar while do-not-disturb is on, with how many notifications it has held
-// back. Click opens the history, right click turns dnd off.
-Field {
+// Notifications button: a bell, or a moon while do-not-disturb is on, with a dot while
+// dnd has held notifications back that haven't been seen. Click opens the history, right
+// click toggles dnd.
+IconButton {
     id: root
 
-    property var bar: null
+    required property var bar
 
-    visible: Notifs.dnd
-    value: "dnd"
-    valueColor: Theme.accent
-    open: bar?.panel === "notif"
+    icon: Notifs.dnd ? "moon" : "bell"
+    iconSize: 17
+    iconColor: Notifs.dnd ? Theme.screen : Theme.text
+    active: bar.panel === "notif"
     onClicked: mouse => {
         if (mouse.button === Qt.RightButton)
-            Notifs.dnd = false;
+            Notifs.dnd = !Notifs.dnd;
         else
-            root.bar?.toggle("notif");
+            root.bar.toggle("notif");
     }
 
-    BarText {
+    Rectangle {
         visible: Notifs.unread > 0
-        text: " " + Notifs.unread
-        color: Theme.label
+        parent: root
+        // A 7px dot with a 1.5px ring around it (borders draw inwards).
+        x: root.width - 4.5 - width
+        y: 2.5
+        width: 10
+        height: 10
+        radius: 5
+        color: Theme.accent
+        border.width: 1.5
+        border.color: Qt.rgba(8 / 255, 18 / 255, 22 / 255, 0.8)
     }
 }

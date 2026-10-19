@@ -52,7 +52,7 @@ PanelWindow {
         id: column
 
         width: parent.width
-        spacing: 6
+        spacing: 10
 
         HoverHandler {
             id: hover
@@ -61,14 +61,15 @@ PanelWindow {
         Repeater {
             model: Notifs.shown
 
-            delegate: Rectangle {
+            delegate: Glass {
                 id: card
 
                 required property var modelData
 
                 Layout.fillWidth: true
                 implicitHeight: content.implicitHeight + 24
-                color: area.containsMouse ? Qt.alpha(Theme.hover, 0.95) : Theme.barBg
+                radius: 18
+                border.color: modelData.critical ? Qt.alpha(Theme.warn, 0.6) : Theme.glassBorder
 
                 // Click: default action (if any), then out of the way.
                 MouseArea {
@@ -80,78 +81,63 @@ PanelWindow {
                     onClicked: Notifs.activate(card.modelData.id)
                 }
 
-                Rectangle {
-                    visible: card.modelData.critical
-                    width: 2
-                    height: parent.height
-                    color: Theme.warn
-                }
-
                 ColumnLayout {
                     id: content
 
                     anchors.left: parent.left
                     anchors.right: parent.right
                     anchors.top: parent.top
-                    anchors.leftMargin: Theme.panelPadding
-                    anchors.rightMargin: Theme.panelPadding
-                    anchors.topMargin: 12
-                    spacing: 4
+                    anchors.margins: 12
+                    spacing: 10
 
-                    RowLayout {
+                    NotifCard {
                         Layout.fillWidth: true
-                        spacing: 8
-
-                        BarText {
-                            Layout.fillWidth: true
-                            text: card.modelData.app
-                            elide: Text.ElideRight
-                            color: card.modelData.critical ? Theme.warn : Theme.label
-                        }
-
-                        Action {
-                            text: "×"
-                            onClicked: Notifs.hidePopup(card.modelData.id)
-                        }
+                        entry: card.modelData
+                        time: "now"
+                        bodyLines: 4
+                        headerInset: closeButton.visible ? 22 : 0
                     }
 
-                    BarText {
-                        Layout.fillWidth: true
-                        visible: text !== ""
-                        text: card.modelData.summary
-                        color: Theme.bright
-                        font.bold: true
-                        wrapMode: Text.Wrap
-                        maximumLineCount: 2
-                        elide: Text.ElideRight
-                    }
-
-                    BarText {
-                        Layout.fillWidth: true
-                        visible: text !== ""
-                        text: card.modelData.body
-                        wrapMode: Text.Wrap
-                        maximumLineCount: 4
-                        elide: Text.ElideRight
-                        lineHeight: 1.2
-                    }
-
-                    Row {
+                    GridLayout {
                         visible: card.modelData.actions.length > 0
-                        Layout.topMargin: 6
-                        spacing: 14
+                        Layout.fillWidth: true
+                        columns: 2
+                        rowSpacing: 8
+                        columnSpacing: 8
 
                         Repeater {
                             model: card.modelData.actions
 
-                            delegate: Action {
+                            delegate: PillButton {
                                 required property var modelData
 
+                                Layout.fillWidth: true
+                                Layout.preferredWidth: 1
+                                pillHeight: 30
                                 text: modelData.text
                                 onClicked: Notifs.invoke(card.modelData.id, modelData.id)
                             }
                         }
                     }
+                }
+
+                // Over the card's own MouseArea, which would otherwise take the hover.
+                CircleButton {
+                    id: closeButton
+
+                    visible: hover.hovered && cardHover.hovered
+                    anchors.top: parent.top
+                    anchors.right: parent.right
+                    anchors.margins: 8
+                    size: 22
+                    icon: "close"
+                    iconSize: 12
+                    restColor: Theme.fillHover
+                    onClicked: Notifs.hidePopup(card.modelData.id)
+                }
+
+                HoverHandler {
+                    id: cardHover
                 }
             }
         }

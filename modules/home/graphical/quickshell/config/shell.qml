@@ -20,6 +20,19 @@ ShellRoot {
         }
     }
 
+    // The drag shelf; shows on one monitor at a time (see Shelf.screenName).
+    Variants {
+        model: Quickshell.screens
+
+        ShelfWindow {}
+    }
+
+    // Screenshot / screen recording overlay (see Screenshot.qml).
+    Variants {
+        model: Quickshell.screens
+        ScreenshotOverlay {}
+    }
+
     // Opens/closes a panel on the focused monitor.
     function toggle(name) {
         const monitor = Hyprland.focusedMonitor?.name;
@@ -43,6 +56,30 @@ ShellRoot {
             // forwards a release bind as a "released" event, so react to that too.
             onReleased: if (modelData === "launcher") shell.toggle(modelData)
         }
+    }
+
+    // The colour picker runs straight away (no panel) and puts its slot in the bar.
+    GlobalShortcut {
+        appid: "quickshell"
+        name: "picker"
+        onPressed: ColorPicker.pick()
+    }
+
+    // Print opens the capture overlay; while recording, it stops the recording instead.
+    GlobalShortcut {
+        appid: "quickshell"
+        name: "screenshot"
+        onPressed: Screenshot.open("selection")
+    }
+    GlobalShortcut {
+        appid: "quickshell"
+        name: "screenshot-window"
+        onPressed: Screenshot.open("window")
+    }
+    GlobalShortcut {
+        appid: "quickshell"
+        name: "screenshot-screen"
+        onPressed: Screenshot.open("screen")
     }
 
     // qmllint enable unresolved-type import required

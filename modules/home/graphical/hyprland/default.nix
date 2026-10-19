@@ -10,8 +10,7 @@
 
   home.packages = with pkgs; [
     hyprpicker
-    hyprshot
-    grim # portal screenshots (xdph)
+    grim # portal screenshots (xdph) and the Quickshell capture overlay
   ];
 
   services.hyprpolkitagent.enable = true;

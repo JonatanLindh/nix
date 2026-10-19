@@ -6,8 +6,9 @@ import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Wayland
 
-// Session menu on super+m (replaces wleave): two rows of three boxes, each with its wleave key.
-// Press the key, or move with the arrows and press enter. No confirmation, by request.
+// Session menu on super+m (replaces wleave): the screen dims and a glass card shows two rows
+// of three tiles, each with its wleave key. Press the key, or move with the arrows (or the
+// mouse) and press enter. No confirmation, by request.
 // qmllint disable uncreatable-type
 PanelWindow {
     id: root
@@ -17,32 +18,44 @@ PanelWindow {
     readonly property var actions: [
         {
             name: "lock",
+            label: "Lock",
+            icon: "lock",
             key: "l",
             command: ["loginctl", "lock-session"]
         },
         {
             name: "hibernate",
+            label: "Hibernate",
+            icon: "hibernate",
             key: "h",
             command: ["systemctl", "hibernate"],
             enabled: Power.canHibernate
         },
         {
             name: "logout",
+            label: "Log out",
+            icon: "logout",
             key: "e",
             command: ["sh", "-c", 'loginctl terminate-user "$USER"']
         },
         {
             name: "shutdown",
+            label: "Shut down",
+            icon: "power",
             key: "s",
             command: ["systemctl", "poweroff"]
         },
         {
             name: "suspend",
+            label: "Suspend",
+            icon: "moon-outline",
             key: "u",
             command: ["systemctl", "suspend"]
         },
         {
             name: "reboot",
+            label: "Reboot",
+            icon: "reboot",
             key: "r",
             command: ["systemctl", "reboot"]
         }
@@ -65,10 +78,12 @@ PanelWindow {
     // open animation. While closed it draws nothing, takes no clicks and no keyboard.
     visible: true
     mask: open ? contentMask : noInput
-    // No anchors: the compositor centres it on the screen.
+    // Covers the whole screen (the dimmed backdrop); the card sits in the middle.
+    anchors.top: true
+    anchors.bottom: true
+    anchors.left: true
+    anchors.right: true
     exclusionMode: ExclusionMode.Ignore
-    implicitWidth: grid.implicitWidth + 2 * Theme.panelPadding
-    implicitHeight: grid.implicitHeight + 2 * Theme.panelPadding
     color: "transparent"
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.namespace: "quickshell:session"
@@ -103,21 +118,22 @@ PanelWindow {
         onTriggered: root.grabReady = true
     }
 
-    // Clicking anywhere else closes it.
+    // Clicking another monitor closes it.
     HyprlandFocusGrab {
         windows: [root]
         active: root.grabReady && root.open
         onCleared: root.close()
     }
 
-    Rectangle {
+    // The backdrop: dims the screen, and a click on it (outside the card) closes.
+    MouseArea {
         id: keys
 
         visible: root.open
 
         anchors.fill: parent
-        color: Theme.barBg
         focus: true
+        onClicked: root.close()
         Keys.onPressed: event => {
             const cols = 3;
             const n = root.actions.length;
@@ -140,51 +156,126 @@ PanelWindow {
             event.accepted = true;
         }
 
-        GridLayout {
-            id: grid
+        Rectangle {
+            anchors.fill: parent
+            color: Qt.rgba(4 / 255, 10 / 255, 12 / 255, 0.42)
+        }
 
+        Glass {
             anchors.centerIn: parent
-            columns: 3
-            rowSpacing: 8
-            columnSpacing: 8
+            width: 560
+            height: card.implicitHeight + 36
+            radius: 28
 
-            Repeater {
-                model: root.actions
+            // Clicks between the tiles stay on the card instead of closing.
+            MouseArea {
+                anchors.fill: parent
+            }
 
-                MouseArea {
-                    id: box
+            ColumnLayout {
+                id: card
 
-                    required property var modelData
-                    required property int index
-                    readonly property bool usable: modelData.enabled !== false
-                    readonly property bool current: root.selected === index
+                anchors.fill: parent
+                anchors.margins: 18
+                spacing: 14
 
-                    implicitWidth: 132
-                    implicitHeight: 84
-                    hoverEnabled: true
-                    cursorShape: usable ? Qt.PointingHandCursor : Qt.ArrowCursor
-                    onEntered: root.selected = index
-                    onClicked: root.run(modelData)
+                GridLayout {
+                    Layout.fillWidth: true
+                    columns: 3
+                    rowSpacing: 10
+                    columnSpacing: 10
 
-                    Rectangle {
-                        anchors.fill: parent
-                        color: box.current && box.usable ? Theme.hover : "transparent"
-                        border.width: 1
-                        border.color: box.current && box.usable ? Theme.accent : Theme.border
+                    Repeater {
+                        model: root.actions
+
+                        MouseArea {
+                            id: box
+
+                            required property var modelData
+                            required property int index
+                            readonly property bool usable: modelData.enabled !== false
+                            readonly property bool current: root.selected === index && usable
+                            readonly property color ink: current ? Theme.ink : usable ? Theme.text : Theme.textFaint
+
+                            Layout.fillWidth: true
+                            Layout.preferredWidth: 1
+                            implicitHeight: 128
+                            hoverEnabled: true
+                            cursorShape: usable ? Qt.PointingHandCursor : Qt.ArrowCursor
+                            onEntered: root.selected = index
+                            onClicked: root.run(modelData)
+
+                            Rectangle {
+                                anchors.fill: parent
+                                radius: 18
+                                color: box.current ? Theme.white : Theme.fill
+                                Behavior on color {
+                                    ColorAnimation {
+                                        duration: Theme.fast
+                                    }
+                                }
+                            }
+
+                            Column {
+                                anchors.centerIn: parent
+                                spacing: 12
+
+                                Icon {
+                                    anchors.horizontalCenter: parent.horizontalCenter
+                                    name: box.modelData.icon
+                                    size: 26
+                                    strokeWidth: 1.8
+                                    color: box.ink
+                                }
+                                UiText {
+                                    anchors.horizontalCenter: parent.horizontalCenter
+                                    text: box.modelData.label
+                                    color: box.ink
+                                    font.pixelSize: 14
+                                    font.weight: Font.Medium
+                                }
+                            }
+
+                            // Key cap, tinted to sit on either fill.
+                            Rectangle {
+                                anchors.top: parent.top
+                                anchors.right: parent.right
+                                anchors.margins: 10
+                                implicitWidth: Math.max(18, keyText.implicitWidth + 10)
+                                implicitHeight: 20
+                                radius: 5
+                                color: box.current ? Qt.alpha(Theme.ink, 0.1) : Qt.rgba(1, 1, 1, 0.1)
+
+                                UiText {
+                                    id: keyText
+                                    anchors.centerIn: parent
+                                    text: box.modelData.key
+                                    mono: true
+                                    color: box.ink
+                                    font.pixelSize: Theme.tiny
+                                }
+                            }
+                        }
                     }
+                }
 
-                    BarText {
-                        anchors.centerIn: parent
-                        text: box.modelData.name
-                        color: !box.usable ? Theme.off : box.current ? Theme.bright : Theme.text
+                Row {
+                    Layout.alignment: Qt.AlignHCenter
+                    spacing: 16
+
+                    UiText {
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: "Press a letter"
+                        dim: true
+                        font.pixelSize: Theme.small
                     }
-
-                    BarText {
-                        anchors.right: parent.right
-                        anchors.bottom: parent.bottom
-                        anchors.margins: 8
-                        text: box.modelData.key
-                        color: !box.usable ? Theme.off : box.current ? Theme.accent : Theme.label
+                    KeyHint {
+                        keys: ["←", "→", "↵"]
+                        text: "Pick"
+                    }
+                    KeyHint {
+                        keys: ["esc"]
+                        text: "Close"
                     }
                 }
             }
