@@ -54,9 +54,9 @@ hl.config({
 
         blur             = {
             enabled = true,
-            xray    = true,
-            size    = 3,
-            passes  = 1,
+            xray    = false, -- blur what's actually underneath, not just the wallpaper
+            size    = 8,
+            passes  = 3,
         },
     },
     animations = {
@@ -167,6 +167,12 @@ hl.layer_rule({
     match       = { namespace = "quickshell:bar" },
     blur        = true,
     blur_popups = true, -- the bar's drop-down panels
+})
+
+hl.layer_rule({
+    name        = "launcher-blur",
+    match       = { namespace = "quickshell:launcher" },
+    blur        = true,
 })
 
 -- Input devices
