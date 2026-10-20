@@ -193,6 +193,12 @@
     extraArgs = [ "--autopilot" ];
   };
 
+  # Remote builds from the xps nix-daemon (passphrase-less key in /etc/nix/builder_ed25519),
+  # restricted to the nix daemon so the key can't open a shell
+  users.users.jonatan.openssh.authorizedKeys.keys = [
+    "restrict,command=\"${config.nix.package}/bin/nix-daemon --stdio\" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIERzLVJj4DEbWkZrMjIyDrqITntUYAVx1n8+V7Ws1W/8 xps nix-daemon"
+  ];
+
   networking = {
     hostName = "desktop";
     interfaces = {

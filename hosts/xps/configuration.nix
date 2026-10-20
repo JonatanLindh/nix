@@ -22,7 +22,9 @@
       protocol = "ssh-ng";
       system = "x86_64-linux";
       sshUser = "jonatan";
-      sshKey = "/home/jonatan/.ssh/id_ed25519";
+      # nix-daemon runs as root without an agent, so it needs a passphrase-less key
+      sshKey = "/etc/nix/builder_ed25519";
+      publicHostKey = "c3NoLWVkMjU1MTkgQUFBQUMzTnphQzFsWkRJMU5URTVBQUFBSUc0QlgyNFF3NEF1RXkwRVM1cFFGTlRtb3ZIaTI5clNwT0V0MFc3NWlMNEEgcm9vdEBkZXNrdG9w";
       maxJobs = 32;
       speedFactor = 2;
       supportedFeatures = [
