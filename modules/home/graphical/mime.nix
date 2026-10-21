@@ -5,10 +5,11 @@
       let
         browser = "zen-beta.desktop";
         image = "org.gnome.Loupe.desktop";
-        fileManager = "org.gnome.Nautilus.desktop";
+        fileManager = "org.kde.dolphin.desktop";
         video = "mpv.desktop";
         editor = "dev.zed.Zed.desktop";
         raw = "org.darktable.darktable.desktop";
+        archive = "org.kde.ark.desktop";
       in
       {
         # Browser (Zen Beta)
@@ -18,7 +19,7 @@
         "x-scheme-handler/about" = [ browser ];
         "x-scheme-handler/unknown" = [ browser ];
 
-        # File manager (Nautilus)
+        # File manager (Dolphin)
         "inode/directory" = [ fileManager ];
 
         # PDF (Gnome Papers)
@@ -63,8 +64,14 @@
         # Text / code (Zed)
         "text/plain" = [ editor ];
 
-        # Archives — conflicts with PrismLauncher, which also claims .zip
-        "application/zip" = [ fileManager ];
+        # Archives (Ark) — conflicts with PrismLauncher, which also claims .zip
+        "application/zip" = [ archive ];
+        "application/x-7z-compressed" = [ archive ];
+        "application/x-tar" = [ archive ];
+        "application/x-compressed-tar" = [ archive ];
+        "application/x-xz-compressed-tar" = [ archive ];
+        "application/x-zstd-compressed-tar" = [ archive ];
+        "application/vnd.rar" = [ archive ];
 
         # Custom scheme handlers
         "x-scheme-handler/discord" = [ "vesktop.desktop" ];

@@ -58,8 +58,12 @@
 
   environment.systemPackages = with pkgs; [
     kdePackages.breeze
+    kdePackages.kio-admin # polkit action for Dolphin's admin:/ ("Open as Administrator")
     libva-utils
   ];
+
+  # kio-admin's privileged helper is a system D-Bus service
+  services.dbus.packages = [ pkgs.kdePackages.kio-admin ];
 
   environment.sessionVariables = {
     NIXOS_OZONE_WL = "1";

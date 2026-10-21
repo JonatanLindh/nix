@@ -15,7 +15,16 @@
     enable = true;
     extraPortals = with pkgs; [
       xdg-desktop-portal-gtk
+      kdePackages.xdg-desktop-portal-kde # file chooser only
     ];
+    # Replaces the hyprland-portals.conf shipped with xdph, so repeat its default.
+    config.hyprland = {
+      default = [
+        "hyprland"
+        "gtk"
+      ];
+      "org.freedesktop.impl.portal.FileChooser" = [ "kde" ];
+    };
   };
 
   security.pam = {

@@ -58,6 +58,7 @@ hl.config({
             xray    = false, -- blur what's actually underneath, not just the wallpaper
             size    = 8,
             passes  = 3,
+            popups  = true, -- translucent app menus (the Kvantum Glass theme) get frosted too
         },
     },
     animations = {
@@ -194,7 +195,7 @@ hl.gesture({
 -- Keybindings
 hl.bind("SUPER + Q", hl.dsp.exec_cmd(Launch "ghostty"))
 hl.bind("SUPER + C", hl.dsp.window.close())
-hl.bind("SUPER + E", hl.dsp.exec_cmd(Launch "nautilus"))
+hl.bind("SUPER + E", hl.dsp.exec_cmd(Launch "dolphin"))
 hl.bind("SUPER + P", hl.dsp.window.float({ action = "toggle" }))
 hl.bind("SUPER + SUPER_L", hl.dsp.global("quickshell:launcher"), { release = true }) -- app launcher (quickshell)
 hl.bind("SUPER + J", hl.dsp.group.toggle())

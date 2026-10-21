@@ -8,6 +8,8 @@
     ./easyeffects
     ./zellij
     ./mime.nix
+    ./dolphin.nix
+    ./qt
     ./clipboard.nix
     ./ai.nix
   ];
@@ -16,7 +18,6 @@
     # Gnome
     baobab # disk usage analyzer
     resources
-    nautilus # file manager
     gnome-disk-utility
     gnome-font-viewer
     gnome-connections

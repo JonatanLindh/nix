@@ -16,6 +16,13 @@
 
     hyprland.url = "github:hyprwm/hyprland";
 
+    # Built against our nixpkgs (see modules/home/graphical/qt.nix) so the plugin
+    # matches the Qt the apps use; not packaged in nixpkgs yet.
+    hyprqt6engine = {
+      url = "github:hyprwm/hyprqt6engine";
+      flake = false;
+    };
+
     zen-browser = {
       url = "github:0xc000022070/zen-browser-flake/beta";
       inputs = {

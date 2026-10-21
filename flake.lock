@@ -353,6 +353,22 @@
         "type": "github"
       }
     },
+    "hyprqt6engine": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1786465893,
+        "narHash": "sha256-UQQue60zRgkz4KqqAyVZlVqGvdGZcj5BuWV9SlbURis=",
+        "owner": "hyprwm",
+        "repo": "hyprqt6engine",
+        "rev": "d0ce29ca5471f406c71558cd9453573686b8c976",
+        "type": "github"
+      },
+      "original": {
+        "owner": "hyprwm",
+        "repo": "hyprqt6engine",
+        "type": "github"
+      }
+    },
     "hyprtoolkit": {
       "inputs": {
         "aquamarine": [
@@ -608,6 +624,7 @@
         "gitalias": "gitalias",
         "home-manager": "home-manager",
         "hyprland": "hyprland",
+        "hyprqt6engine": "hyprqt6engine",
         "nix-vscode-extensions": "nix-vscode-extensions",
         "nixos-vscode-server": "nixos-vscode-server",
         "nixpkgs": "nixpkgs_2",
