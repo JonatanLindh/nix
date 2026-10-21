@@ -33,134 +33,147 @@ PanelWindow {
     // A file is being dragged out: the card fades and lets the pointer through.
     property bool dragging: false
 
-    readonly property string home: Quickshell.env("HOME")
-
     // ---- Apps
 
-    // Visible desktop entries, alphabetical, with lowercased fields for matching.
+    // Visible desktop entries, with what else they can be found by (generic name, keywords, id).
     readonly property var apps: DesktopEntries.applications.values.filter(e => !e.noDisplay).map(e => ({
                 entry: e,
                 id: e.id,
                 name: e.name,
                 icon: e.icon,
-                lname: e.name.toLowerCase(),
-                words: e.name.toLowerCase().split(/[\s\-_.]+/),
-                hay: [e.genericName, e.id].concat(e.keywords).join(" ").toLowerCase(),
+                hay: [e.genericName, e.id].concat(e.keywords).join(" "),
                 detail: e.genericName || e.comment
-            })).sort((a, b) => a.lname.localeCompare(b.lname)).map((a, i) => Object.assign(a, {
-            order: i
-        }))
-
-    // Launches per desktop id: { id: { n: count, t: last launch in ms } }, kept in
-    // the state dir.
-    property var launches: ({})
-
-    readonly property bool showRecent: mode === "apps" && query.trim() === "" && recent.length > 0
-    readonly property var recent: apps.filter(a => launches[a.id]).sort((x, y) => frecency(y.id) - frecency(x.id) || x.order - y.order).slice(0, 6)
+            }))
+    readonly property var appById: {
+        const m = {};
+        for (const a of apps)
+            m[a.id] = a;
+        return m;
+    }
+    readonly property var passById: {
+        const m = {};
+        for (const i of pw.items)
+            m[i.id] = i;
+        return m;
+    }
 
     // ---- What the current mode shows
 
-    readonly property var shownApps: mode === "apps" ? rank(query) : []
-    readonly property var calcResult: mode === "calc" ? calc(query) : null
+    // Ranked by qs-find (see Search below), which answers asynchronously.
+    property var shownApps: []
+    // The most used apps, shown above the list while the search is empty.
+    property var recent: []
+    readonly property bool showRecent: mode === "apps" && query.trim() === "" && recent.length > 0
+    property var rankedPass: []
+    property var calcResult: null
     readonly property var shownClips: mode === "clip" ? clip.filter(query) : []
-    readonly property var shownPass: mode === "pass" ? (pw.item ? pw.matchFields(query) : pw.rank(query)) : []
-    // File results for `fileKey` (see the search below).
+    readonly property var shownPass: mode === "pass" ? (pw.item ? pw.matchFields(query) : rankedPass) : []
     property var files: []
     property int filesTotal: 0
+    property bool filesCapped: false
 
     readonly property var rows: mode === "apps" ? shownApps : mode === "files" ? files : mode === "clip" ? shownClips : mode === "pass" ? shownPass : []
     readonly property var current: rows.length > 0 ? rows[Math.min(sel, rows.length - 1)] : null
-
-    // Frequency, weighted towards recent use.
-    function frecency(id) {
-        const u = launches[id];
-        if (!u)
-            return 0;
-        const days = (Date.now() - u.t) / 86400000;
-        return u.n * (days < 1 ? 4 : days < 7 ? 2 : days < 30 ? 1 : 0.5);
-    }
-
-    // Apps rank by name prefix > word prefix > substring (name, generic name, keywords,
-    // id) > subsequence of the name; ties go to the more used, then alphabetical.
-    function rank(text) {
-        const q = text.trim().toLowerCase();
-        const scored = [];
-        for (const a of apps) {
-            let tier = -1;
-            if (!q)
-                tier = 0;
-            else if (a.lname.startsWith(q))
-                tier = 0;
-            else if (a.words.some(w => w.startsWith(q)))
-                tier = 1;
-            else if (a.lname.includes(q) || a.hay.includes(q))
-                tier = 2;
-            else if (subsequence(q, a.lname))
-                tier = 3;
-            if (tier >= 0)
-                scored.push({
-                    tier: tier,
-                    use: frecency(a.id),
-                    app: a
-                });
-        }
-        // The JS sort here isn't stable, so alphabetical order is the last key.
-        scored.sort((x, y) => x.tier - y.tier || y.use - x.use || x.app.order - y.app.order);
-        return scored.map(s => s.app);
-    }
-
-    function subsequence(q, s) {
-        let i = 0;
-        for (let j = 0; j < s.length && i < q.length; j++)
-            if (s[j] === q[i])
-                i++;
-        return i === q.length;
-    }
-
-    // Arithmetic only: digits, operators, parens, dots. "^" is a power.
-    function calc(expr) {
-        const e = expr.trim();
-        if (!e)
-            return {
-                ok: false,
-                text: "Type an expression"
-            };
-        if (/^[\d\s+\-*/%^().]+$/.test(e)) {
-            try {
-                const r = Function(`"use strict"; return (${e.replace(/\^/g, "**")});`)();
-                if (typeof r === "number" && isFinite(r))
-                    return {
-                        ok: true,
-                        text: String(parseFloat(r.toPrecision(12)))
-                    };
-            } catch (err) {}
-        }
-        return {
-            ok: false,
-            text: "Not an expression"
-        };
-    }
 
     function launchApp(app) {
         if (!app)
             return;
         close();
-        record(app.id);
+        send({
+            op: "used",
+            list: "apps",
+            id: app.id
+        });
         Quickshell.execDetached(["uwsm-app", "--", app.id.endsWith(".desktop") ? app.id : app.id + ".desktop"]);
     }
 
-    function record(id) {
-        const l = Object.assign({}, launches);
-        const u = l[id] ?? {
-            n: 0,
-            t: 0
-        };
-        l[id] = {
-            n: u.n + 1,
-            t: Date.now()
-        };
-        launches = l;
-        store.setText(JSON.stringify(l));
+    // ---- Search
+
+    // qs-find (helpers/) ranks apps and 1Password items (name prefix > word prefix > substring
+    // > fuzzy, then the more used, then alphabetical; it keeps the launch counts), searches
+    // files and evaluates the calculator. Requests carry a sequence number and only the
+    // answer to the latest of each kind is used.
+    property int seq: 0
+    property int rankSeq: 0
+    property int calcSeq: 0
+    property int filesSeq: 0
+    property int filesDone: 0
+
+    function send(request) {
+        if (finder.running)
+            finder.write(JSON.stringify(request) + "\n");
+    }
+
+    function sendLists() {
+        send({
+            op: "items",
+            list: "apps",
+            items: apps.map(a => ({
+                        id: a.id,
+                        name: a.name,
+                        hay: a.hay
+                    }))
+        });
+        send({
+            op: "items",
+            list: "pass",
+            items: pw.items.map(i => ({
+                        id: i.id,
+                        name: i.title,
+                        hay: i.user + " " + i.urls
+                    }))
+        });
+    }
+
+    // Asks for what the current mode and query show (files go through the debounce instead).
+    function ask() {
+        if (!open)
+            return;
+        if (mode === "apps" || (mode === "pass" && !pw.item)) {
+            rankSeq = ++seq;
+            send({
+                op: "rank",
+                seq: rankSeq,
+                list: mode,
+                q: query,
+                limit: mode === "pass" ? 50 : 0
+            });
+        } else if (mode === "calc") {
+            calcSeq = ++seq;
+            send({
+                op: "calc",
+                seq: calcSeq,
+                q: query
+            });
+        }
+    }
+
+    function answered(d) {
+        if (d.re === "rank" && d.seq === rankSeq) {
+            if (d.list === "apps") {
+                shownApps = d.ids.map(id => appById[id]).filter(a => a);
+                recent = d.recent.map(id => appById[id]).filter(a => a);
+            } else {
+                rankedPass = d.ids.map(id => passById[id]).filter(i => i);
+            }
+        } else if (d.re === "calc" && d.seq === calcSeq) {
+            calcResult = {
+                ok: d.ok,
+                text: d.text
+            };
+        } else if (d.re === "files" && d.seq === filesSeq) {
+            files = d.files;
+            filesTotal = d.total;
+            filesCapped = d.capped;
+            filesDone = d.seq;
+            sel = 0;
+        }
+    }
+
+    onQueryChanged: Qt.callLater(ask)
+    onAppsChanged: {
+        sendLists();
+        Qt.callLater(ask);
     }
 
     // ---- Modes
@@ -200,11 +213,9 @@ PanelWindow {
             clip.load();
         else if (m === "pass")
             pw.refresh();
-        else if (m === "files") {
-            finder.key = "";
-            finder.done = "";
+        else if (m === "files")
             searchSoon();
-        }
+        Qt.callLater(ask);
     }
 
     // A prefix typed (or pasted) at the start of the apps search becomes the mode chip.
@@ -300,13 +311,9 @@ PanelWindow {
 
     // ---- Files
 
-    // fd when it's installed (fast, skips .gitignored trees), find otherwise.
-    property bool hasFd: true
-    // What the file list should show, as JSON [scope, query]; `finder.key` is what the
-    // running (or last) search was for.
-    property string fileKey: ""
-    readonly property bool filesBusy: mode === "files" && (fileKey !== finder.done || debounce.running)
-    readonly property int fileLimit: 50
+    // Searches go to qs-find after a short pause in typing; it stops a search when a newer
+    // one comes in. 50 rows at most; `filesTotal` counts up to 400 matches.
+    readonly property bool filesBusy: mode === "files" && (filesSeq !== filesDone || debounce.running)
 
     readonly property string filesHeading: {
         if (mode !== "files")
@@ -326,111 +333,13 @@ PanelWindow {
     function runSearch() {
         if (!open || mode !== "files")
             return;
-        fileKey = JSON.stringify([scope, query.trim()]);
-        if (finder.running) {
-            // Stopped; it starts again from onRunningChanged.
-            if (finder.key !== fileKey)
-                finder.running = false;
-            return;
-        }
-        if (finder.key === fileKey)
-            return;
-        const cmd = fileCommand(scope, query.trim());
-        finder.key = fileKey;
-        if (cmd.length === 0) {
-            files = [];
-            filesTotal = 0;
-            finder.done = fileKey;
-            return;
-        }
-        finder.command = cmd;
-        finder.running = true;
-    }
-
-    // A command printing "mtime\ttype\tpath\0" per file.
-    function fileCommand(scope, q) {
-        const stat = 'xargs -0 -r stat --printf "%Y\\t%F\\t%n\\0" -- 2>/dev/null';
-        const base = scope === "downloads" ? home + "/Downloads" : scope === "root" ? "/" : home;
-        const words = q.split(/\s+/).filter(w => w);
-        if (words.length === 0) {
-            if (scope === "downloads")
-                return ["sh", "-c", 'find "$1" -mindepth 1 -maxdepth 1 ! -name ".*" -print0 | ' + stat, "sh", base];
-            if (scope === "home")
-                // Recently used files (GTK's list, which most apps add to), most recent first.
-                return ["sh", "-c", 'f="$HOME/.local/share/recently-used.xbel"; [ -r "$f" ] || exit 0; ' + 'sed -n \'s/.*<bookmark href="file:\\/\\/\\([^"]*\\)".* modified="\\([^"]*\\)".*/\\2\t\\1/p\' "$f" | sort -r | cut -f2 | ' + 'sed "s/&amp;/\\&/g" | awk \'!seen[$0]++\' | head -n 120 | ' + 'while IFS= read -r p; do printf "%b\\0" "$(printf %s "$p" | sed "s/%/\\\\x/g")"; done | ' + stat];
-            return [];
-        }
-        // A "/" in the query matches against the whole path instead of the name.
-        const full = words.some(w => w.includes("/"));
-        // Skipped when searching from /: huge, virtual, or both.
-        const skip = ["/nix/store", "/proc", "/sys", "/dev", "/run"];
-        if (hasFd) {
-            const args = ["--color=never", "--fixed-strings", "--print0", "--max-results", "400"];
-            if (full)
-                args.push("--full-path");
-            if (scope === "root")
-                for (const s of skip)
-                    args.push("--exclude", s);
-            for (const w of words.slice(1))
-                args.push("--and=" + w);
-            args.push("--", words[0], base);
-            return ["sh", "-c", 'fd "$@" | ' + stat, "sh"].concat(args);
-        }
-        const glob = w => "*" + w.replace(/[*?[\]\\]/g, "\\$&") + "*";
-        const args = [base, "-mindepth", "1", "(", "-name", ".*"];
-        if (scope === "root")
-            for (const s of skip)
-                args.push("-o", "-path", s);
-        args.push(")", "-prune", "-o");
-        for (const w of words)
-            args.push(full ? "-ipath" : "-iname", glob(w));
-        args.push("-print0");
-        return ["sh", "-c", 'find "$@" 2>/dev/null | head -z -n 400 | ' + stat, "sh"].concat(args);
-    }
-
-    // Name prefix > name has every word > path match; then shallower, then newer. Listings
-    // without a query keep their own order (newest first, or most recently used).
-    function parseFiles(text, key) {
-        const [scope, q] = JSON.parse(key);
-        const words = q.toLowerCase().split(/\s+/).filter(w => w);
-        const out = [];
-        for (const rec of text.split("\0")) {
-            const parts = rec.split("\t");
-            if (parts.length < 3)
-                continue;
-            const path = parts.slice(2).join("\t").replace(/(.)\/$/, "$1");
-            const slash = path.lastIndexOf("/");
-            const name = path.slice(slash + 1);
-            const dir = path.slice(0, slash) || "/";
-            const lname = name.toLowerCase();
-            out.push({
-                path: path,
-                name: name,
-                dir: dir === home ? "~" : dir.startsWith(home + "/") ? "~" + dir.slice(home.length) : dir,
-                mtime: Number(parts[0]),
-                kind: parts[1] === "directory" ? "folder" : fileKind(lname),
-                tier: !words.length ? 0 : lname.startsWith(words[0]) ? 0 : words.every(w => lname.includes(w)) ? 1 : 2,
-                depth: path.split("/").length
-            });
-        }
-        if (words.length)
-            out.sort((a, b) => a.tier - b.tier || a.depth - b.depth || b.mtime - a.mtime);
-        else if (scope === "downloads")
-            out.sort((a, b) => b.mtime - a.mtime);
-        filesTotal = out.length;
-        return out.slice(0, fileLimit);
-    }
-
-    function fileKind(name) {
-        if (/\.(png|jpe?g|gif|webp|avif|heic|svg|bmp|tiff?|cr[23]|arw|nef|dng)$/.test(name))
-            return "image";
-        if (/\.(mp4|mkv|webm|mov|avi|m4v)$/.test(name))
-            return "video";
-        if (/\.(zip|tar|gz|tgz|xz|zst|bz2|7z|rar|iso)$/.test(name))
-            return "archive";
-        if (/\.(nix|lua|qml|js|mjs|ts|tsx|jsx|py|rs|go|c|h|cc|cpp|hpp|java|kt|sh|fish|zsh|json|toml|ya?ml|html|css|scss|sql|zig|hs|rb|php|lock)$/.test(name) || ["makefile", "justfile", "dockerfile"].includes(name))
-            return "code";
-        return "file";
+        filesSeq = ++seq;
+        send({
+            op: "files",
+            seq: filesSeq,
+            scope: scope,
+            q: query.trim()
+        });
     }
 
     readonly property var fileTints: ({
@@ -526,8 +435,8 @@ PanelWindow {
         if (mode === "files") {
             if (filesBusy && n === 0)
                 return "Searching…";
-            const count = filesTotal > n ? `${n} of ${filesTotal}${filesTotal >= 400 ? "+" : ""} files` : n + (n === 1 ? " file" : " files");
-            return count + (scope === "root" ? " · skips /nix/store" : "") + (hasFd ? "" : " · install fd for faster search");
+            const count = filesTotal > n ? `${n} of ${filesTotal}${filesCapped ? "+" : ""} files` : n + (n === 1 ? " file" : " files");
+            return count + (scope === "root" ? " · skips /nix/store" : "");
         }
         if (mode === "clip")
             return `${n} of ${clip.entries.length} entries`;
@@ -580,6 +489,17 @@ PanelWindow {
         function onLoadingChanged() {
             if (!pw.loading && root.open)
                 Qt.callLater(() => search.forceActiveFocus());
+        }
+        function onItemsChanged() {
+            root.sendLists();
+            Qt.callLater(root.ask);
+        }
+        function onUsed(id) {
+            root.send({
+                op: "used",
+                list: "pass",
+                id: id
+            });
         }
     }
 
@@ -1647,45 +1567,31 @@ PanelWindow {
 
     // ---- Processes
 
+    // The search, one for as long as the launcher exists (see Search above).
     Process {
         id: finder
-
-        // The search this run is for, and the last one whose results are shown.
-        property string key: ""
-        property string done: ""
-
-        stdout: StdioCollector {
-            onStreamFinished: {
-                // A search stopped for a newer one still ends here; drop its output.
-                if (finder.key !== root.fileKey)
-                    return;
-                root.files = root.parseFiles(text, finder.key);
-                root.sel = 0;
-                finder.done = finder.key;
-            }
-        }
-        onRunningChanged: if (!running)
-            Qt.callLater(root.runSearch)
-    }
-
-    Process {
-        command: ["sh", "-c", "command -v fd"]
+        command: ["qs-find", "--usage", "apps=" + Quickshell.statePath("launcher.json"), "--usage", "pass=" + Quickshell.statePath("passwords.json")]
         running: true
-        onExited: code => root.hasFd = code === 0
-    }
-
-    FileView {
-        id: store
-
-        path: Quickshell.statePath("launcher.json")
-        // A missing file just means nothing has been launched yet.
-        printErrors: false
-        onLoaded: {
-            try {
-                root.launches = JSON.parse(text()) ?? {};
-            } catch (err) {
-                root.launches = {};
+        stdinEnabled: true
+        stdout: SplitParser {
+            onRead: line => {
+                try {
+                    root.answered(JSON.parse(line));
+                } catch (e) {}
             }
         }
+        onStarted: {
+            root.sendLists();
+            root.ask();
+        }
+        // It only stops if it couldn't start (not installed yet) or crashed; try again later.
+        onRunningChanged: if (!running)
+            finderRestart.start()
+    }
+
+    Timer {
+        id: finderRestart
+        interval: 5000
+        onTriggered: finder.running = true
     }
 }

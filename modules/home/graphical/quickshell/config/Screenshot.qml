@@ -30,8 +30,25 @@ Singleton {
     property string recordingFile: ""
 
     // Window rectangles for window mode, global logical coordinates, topmost first:
-    // [{ x, y, w, h, title, monitor }]
-    property var windows: []
+    // [{ x, y, w, h, title, monitor }]. From Hyprland's window and monitor lists (their
+    // lastIpcObject, refreshed as the overlay opens): the mapped windows on each monitor's
+    // shown workspaces, by focus history, which is close to the stacking order for tiled and
+    // floating windows alike.
+    readonly property var windows: {
+        if (!active)
+            return [];
+        const monitors = Hyprland.monitors.values.map(m => m.lastIpcObject).filter(m => m?.id !== undefined);
+        // No flatMap in QML's JavaScript.
+        const shown = [].concat(...monitors.map(m => [m.activeWorkspace?.id, m.specialWorkspace?.id])).filter(id => id !== undefined && id !== 0);
+        return Hyprland.toplevels.values.map(t => t.lastIpcObject).filter(w => w?.mapped && !w.hidden && shown.includes(w.workspace?.id)).sort((a, b) => a.focusHistoryID - b.focusHistoryID).map(w => ({
+                    x: w.at[0],
+                    y: w.at[1],
+                    w: w.size[0],
+                    h: w.size[1],
+                    title: w.title,
+                    monitor: monitors.find(m => m.id === w.monitor)?.name ?? ""
+                }));
+    }
 
     readonly property string picturesDir: Quickshell.env("HOME") + "/Pictures/Screenshots"
     readonly property string videosDir: Quickshell.env("HOME") + "/Videos/Screencasts"
@@ -44,7 +61,8 @@ Singleton {
             return;
         }
         mode = m ?? "selection";
-        windowList.running = true;
+        Hyprland.refreshMonitors();
+        Hyprland.refreshToplevels();
         active = true;
     }
 
@@ -159,33 +177,6 @@ Singleton {
             Quickshell.execDetached(["dbus-send", "--session", "--dest=org.freedesktop.FileManager1", "--type=method_call", "/org/freedesktop/FileManager1", "org.freedesktop.FileManager1.ShowItems", `array:string:file://${file}`, "string:"]);
         else if (action === "shelf")
             Shelf.add([file]);
-    }
-
-    // Window mode: the visible windows' rectangles, topmost first (by focus history, which
-    // is close to the stacking order for tiled and floating windows alike).
-    Process {
-        id: windowList
-        command: ["sh", "-c", "hyprctl -j monitors; printf '\\n---\\n'; hyprctl -j clients"]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                try {
-                    const [m, c] = text.split("\n---\n");
-                    const monitors = JSON.parse(m);
-                    // No flatMap in QML's JavaScript.
-                    const shown = [].concat(...monitors.map(mon => [mon.activeWorkspace?.id, mon.specialWorkspace?.id])).filter(id => id !== undefined && id !== 0);
-                    root.windows = JSON.parse(c).filter(w => w.mapped && !w.hidden && shown.includes(w.workspace?.id)).sort((a, b) => a.focusHistoryID - b.focusHistoryID).map(w => ({
-                                x: w.at[0],
-                                y: w.at[1],
-                                w: w.size[0],
-                                h: w.size[1],
-                                title: w.title,
-                                monitor: monitors.find(mon => mon.id === w.monitor)?.name ?? ""
-                            }));
-                } catch (e) {
-                    root.windows = [];
-                }
-            }
-        }
     }
 
     // `qs ipc call screenshot open` (or window / screen / stop / close) from scripts.

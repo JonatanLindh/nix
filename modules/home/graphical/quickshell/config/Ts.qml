@@ -3,7 +3,9 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-// Tailscale through its CLI. Changing anything needs `--operator=<user>` (set in common.nix).
+// Tailscale through qs-ts (helpers/): it pushes the state whenever tailscaled reports a change,
+// and runs changes through the CLI one at a time. Changing anything needs `--operator=<user>`
+// (set in common.nix).
 Singleton {
     id: root
 
@@ -11,7 +13,9 @@ Singleton {
     // BackendState: Running, Stopped, NeedsLogin, Starting, ...
     property string backend: ""
     readonly property bool up: backend === "Running"
+    // { name, dns, ip }
     property var self: null
+    // [{ name, dns, ip, os, online, exitOption, exitActive }], online first
     property var peers: []
     readonly property var exitNode: peers.find(p => p.exitActive) ?? null
     readonly property var exitOptions: peers.filter(p => p.exitOption)
@@ -19,29 +23,24 @@ Singleton {
     property var serves: []
     readonly property bool funnelActive: serves.some(s => s.funnel)
     property string error: ""
-    // Poll faster while the panel is open.
-    property bool watching: false
 
+    // State is pushed, so this is only for a fresh look (when the panel opens).
     function refresh() {
-        statusQuery.running = true;
-        serveQuery.running = true;
+        send({
+            op: "refresh"
+        });
     }
-
-    // Commands run one at a time, then state is re-read.
-    property var queue: []
 
     function run(args) {
-        queue = queue.concat([args]);
-        next();
+        send({
+            op: "run",
+            args: args
+        });
     }
 
-    function next() {
-        if (command.running || queue.length === 0)
-            return;
-        // Tailscale also prints informational messages on stderr; only surface output on failure.
-        command.command = ["sh", "-c", 'out=$("$@" 2>&1) || { printf "%s" "$out" >&2; exit 1; }', "sh", "tailscale"].concat(queue[0]);
-        queue = queue.slice(1);
-        command.running = true;
+    function send(request) {
+        if (watcher.running)
+            watcher.write(JSON.stringify(request) + "\n");
     }
 
     function setUp(on) {
@@ -70,88 +69,39 @@ Singleton {
     }
 
     Process {
-        id: command
-        stderr: StdioCollector {
-            onStreamFinished: root.error = text.trim().split("\n").filter(l => l.trim()).pop() ?? ""
-        }
-        onRunningChanged: {
-            if (running)
-                return;
-            root.refresh();
-            root.next();
-        }
-    }
-
-    Process {
-        id: statusQuery
-        command: ["tailscale", "status", "--json"]
-        stdout: StdioCollector {
-            onStreamFinished: {
+        id: watcher
+        command: ["qs-ts", "watch"]
+        running: true
+        stdinEnabled: true
+        stdout: SplitParser {
+            onRead: line => {
                 let d;
                 try {
-                    d = JSON.parse(text);
-                } catch (e) {
-                    root.available = false;
-                    return;
-                }
-                const strip = s => (s ?? "").replace(/\.$/, "");
-                // The DNS label is the unique machine name; HostName can be generic.
-                const name = p => strip(p.DNSName).split(".")[0] || p.HostName;
-                root.available = true;
-                root.backend = d.BackendState ?? "";
-                root.self = d.Self ? {
-                    name: name(d.Self),
-                    dns: strip(d.Self.DNSName),
-                    ip: d.Self.TailscaleIPs?.[0] ?? ""
-                } : null;
-                root.peers = Object.values(d.Peer ?? {}).map(p => ({
-                            name: name(p),
-                            dns: strip(p.DNSName),
-                            ip: p.TailscaleIPs?.[0] ?? "",
-                            os: p.OS ?? "",
-                            online: !!p.Online,
-                            exitOption: !!p.ExitNodeOption,
-                            exitActive: !!p.ExitNode
-                        })).filter(p => !p.name.startsWith("funnel-ingress-node")).sort((a, b) => (b.online - a.online) || a.name.localeCompare(b.name));
-            }
-        }
-    }
-
-    Process {
-        id: serveQuery
-        command: ["tailscale", "serve", "status", "--json"]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                let d;
-                try {
-                    d = JSON.parse(text || "{}");
+                    d = JSON.parse(line);
                 } catch (e) {
                     return;
                 }
-                const funnel = d.AllowFunnel ?? {};
-                const out = [];
-                for (const [hostPort, web] of Object.entries(d.Web ?? {})) {
-                    const port = hostPort.split(":").pop();
-                    for (const [path, h] of Object.entries(web.Handlers ?? {})) {
-                        out.push({
-                            port: port,
-                            path: path,
-                            target: h.Proxy ?? h.Path ?? (h.Text !== undefined ? "text" : "?"),
-                            funnel: !!funnel[hostPort],
-                            url: "https://" + hostPort.replace(/:443$/, "") + (path === "/" ? "" : path)
-                        });
-                    }
+                if (d.error !== undefined) {
+                    root.error = d.error;
+                    return;
                 }
-                root.serves = out.sort((a, b) => a.port - b.port || a.path.localeCompare(b.path));
+                root.available = d.available;
+                root.backend = d.backend;
+                root.self = d.self;
+                root.peers = d.peers;
+                root.serves = d.serves;
             }
+        }
+        // It only stops if it couldn't start (not installed yet) or crashed; try again later.
+        onRunningChanged: if (!running) {
+            root.available = false;
+            restart.start();
         }
     }
 
     Timer {
-        interval: root.watching ? 2000 : 10000
-        running: true
-        repeat: true
-        triggeredOnStart: true
-        onTriggered: root.refresh()
+        id: restart
+        interval: 10000
+        onTriggered: watcher.running = true
     }
 }

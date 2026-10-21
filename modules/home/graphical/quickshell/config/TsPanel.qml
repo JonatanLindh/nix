@@ -61,7 +61,6 @@ Panel {
     backTo: "net"
 
     onVisibleChanged: {
-        Ts.watching = visible;
         if (visible) {
             Ts.error = "";
             Ts.refresh();

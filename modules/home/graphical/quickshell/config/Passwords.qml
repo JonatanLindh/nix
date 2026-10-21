@@ -9,7 +9,6 @@ import Quickshell.Io
 // something has qs-op put it straight onto the clipboard (sensitive, so cliphist skips it,
 // and cleared after 30s). Enter pastes the password, ctrl+enter the username, alt+enter
 // the one-time code; add shift to only copy. Tab opens an item's fields.
-// Bar.qml still creates one of these next to the launcher's own; that one stays idle.
 Scope {
     id: root
 
@@ -36,31 +35,8 @@ Scope {
     property var fieldCache: ({})
     property var wantFields: null
 
-    // Picks per item id: { id: { n: count, t: last pick in ms } }, kept in the state dir.
-    property var uses: ({})
-
-    // Frequency, weighted towards recent use (same as the launcher).
-    function frecency(id) {
-        const u = uses[id];
-        if (!u)
-            return 0;
-        const days = (Date.now() - u.t) / 86400000;
-        return u.n * (days < 1 ? 4 : days < 7 ? 2 : days < 30 ? 1 : 0.5);
-    }
-
-    function record(id) {
-        const all = Object.assign({}, uses);
-        const u = all[id] ?? {
-            n: 0,
-            t: 0
-        };
-        all[id] = {
-            n: u.n + 1,
-            t: Date.now()
-        };
-        uses = all;
-        usageStore.setText(JSON.stringify(all));
-    }
+    // An item was picked; the launcher counts it towards its ranking (qs-find keeps the counts).
+    signal used(string id)
 
     // Starts a refresh of the list; called when the launcher enters passwords mode.
     function refresh() {
@@ -73,44 +49,6 @@ Scope {
         if (loading)
             slowLoad.restart();
         listing.running = true;
-    }
-
-    // Title prefix > word prefix > substring (title, username, urls) > subsequence of the
-    // title; ties (and an empty query) go to the most used, then alphabetical. At most 50 rows.
-    function rank(text) {
-        const q = text.trim().toLowerCase();
-        if (!q)
-            return items.slice().sort((a, b) => frecency(b.id) - frecency(a.id) || a.title.localeCompare(b.title)).slice(0, 50);
-        const scored = [];
-        for (const i of items) {
-            const t = i.title.toLowerCase();
-            let s = 0;
-            if (t.startsWith(q))
-                s = 4;
-            else if (t.split(/[\s\-_.@]+/).some(w => w.startsWith(q)))
-                s = 3;
-            else if (t.includes(q) || i.user.toLowerCase().includes(q) || i.urls.toLowerCase().includes(q))
-                s = 2;
-            else if (subsequence(q, t))
-                s = 1;
-            if (s > 0)
-                scored.push({
-                    item: i,
-                    score: s
-                });
-        }
-        return scored.sort((a, b) => b.score - a.score || frecency(b.item.id) - frecency(a.item.id) || a.item.title.localeCompare(b.item.title)).slice(0, 50).map(x => x.item);
-    }
-
-    function subsequence(q, s) {
-        let i = 0;
-        for (const c of s) {
-            if (c === q[i])
-                i++;
-            if (i === q.length)
-                return true;
-        }
-        return false;
     }
 
     function matchFields(text) {
@@ -129,7 +67,7 @@ Scope {
     function take(target, what, paste) {
         if (!target)
             return;
-        record(target.id);
+        root.used(target.id);
         copier.command = ["qs-op", "copy", target.vault, target.id, what].concat(paste ? ["paste"] : []);
         copier.running = true;
     }
@@ -174,21 +112,6 @@ Scope {
         id: slowLoad
         interval: 1500
         onTriggered: root.authorizing = root.loading
-    }
-
-    FileView {
-        id: usageStore
-
-        path: Quickshell.statePath("passwords.json")
-        // A missing file just means nothing has been picked yet.
-        printErrors: false
-        onLoaded: {
-            try {
-                root.uses = JSON.parse(text()) ?? {};
-            } catch (err) {
-                root.uses = {};
-            }
-        }
     }
 
     Process {

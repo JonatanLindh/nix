@@ -1,0 +1,17 @@
+[package]
+name = "qs-helpers"
+version = "0.1.0"
+edition = "2024"
+description = "Data helpers for the Quickshell bar: Tailscale, launcher search, clipboard history"
+
+[dependencies]
+anyhow = "1"
+ignore = "0.4"
+nucleo-matcher = "0.3"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["macros", "rt", "net", "io-util", "io-std", "process", "sync", "time"] }
+
+[profile.release]
+strip = true
+lto = "thin"

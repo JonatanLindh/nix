@@ -8,6 +8,7 @@
 {
   imports = [
     ./calendar
+    ./helpers
     ./scripts
     ./shelf
   ];
@@ -33,7 +34,6 @@
     pavucontrol
     networkmanagerapplet # nm-connection-editor, the network panel's "Network settings…"
     kdePackages.qtdeclarative # qmlls, matching the Qt quickshell is built against
-    fd # launcher file search (falls back to find without it)
     gradia # screenshot editor (annotations, OCR), opened from the screenshot notification
     wf-recorder # screen recordings from the capture overlay
     imagemagick # crops screenshots out of the overlay's frozen frame
