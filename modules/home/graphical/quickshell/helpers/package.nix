@@ -3,6 +3,7 @@
   rustPlatform,
   makeWrapper,
   cliphist,
+  libqalculate,
   wl-clipboard,
   tailscale,
 }:
@@ -34,6 +35,7 @@ rustPlatform.buildRustPackage {
       ]
     }
     wrapProgram $out/bin/qs-ts --suffix PATH : ${lib.makeBinPath [ tailscale ]}
+    wrapProgram $out/bin/qs-find --prefix PATH : ${lib.makeBinPath [ libqalculate ]}
   '';
 
   meta = {

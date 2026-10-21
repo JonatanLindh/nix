@@ -6,16 +6,22 @@
 //!   {"op": "rank", "seq": 1, "list": "apps", "q": "fi", "limit": 0}
 //!       → {"re": "rank", "seq": 1, "list": "apps", "ids": [...], "recent": [...]}
 //!   {"op": "used", "list": "apps", "id": "firefox.desktop"}             count a launch or pick
-//!   {"op": "calc", "seq": 2, "q": "2^10"}  → {"re": "calc", "seq": 2, "ok": true, "text": "1024"}
+//!   {"op": "calc", "seq": 2, "q": "5 km/h to m/s"}
+//!       → {"re": "calc", "seq": 2, "ok": true, "text": "(25/18) m/s", "math": <tree>,
+//!          "approx": "1.388 888 889 m/s", "value": "1.388888889 m/s", "exact": ..., "tex": ...}
+//!   (text is the exact form and math the same typeset, see tex.rs; approx is the decimal
+//!   one when it differs; value, exact and tex are what to copy)
 //!   {"op": "files", "seq": 3, "scope": "home", "q": "notes"}
 //!       → {"re": "files", "seq": 3, "files": [...], "total": 12, "capped": false}
 //!
 //! Lists are "apps" and "pass"; `--usage LIST=PATH` names the JSON file each one's launch
-//! counts are kept in. A file search runs on its own thread, and a newer one stops it.
+//! counts are kept in. File searches and calculations (qalc) run on their own threads, and a
+//! newer one of the same kind stops the older.
 
 mod calc;
 mod files;
 mod rank;
+mod tex;
 
 use rank::{Item, List};
 use serde::Deserialize;
@@ -72,8 +78,9 @@ fn main() {
         }
     }
     let home = PathBuf::from(std::env::var_os("HOME").unwrap_or_else(|| "/".into()));
-    // The newest file search; older ones see it change and stop.
+    // The newest file search and calculation; older ones see it change and stop.
     let search = Arc::new(AtomicU64::new(0));
+    let calcs = Arc::new(AtomicU64::new(0));
 
     for line in std::io::stdin().lock().lines() {
         let Ok(line) = line else { break };
@@ -112,14 +119,24 @@ fn main() {
                     .used(&id);
             }
             Request::Calc { seq, q } => {
-                let (ok, text) = match q.trim() {
-                    "" => (false, "Type an expression".to_string()),
-                    e => match calc::eval(e) {
-                        Some(r) => (true, calc::format(r)),
-                        None => (false, "Not an expression".to_string()),
-                    },
-                };
-                emit(json!({ "re": "calc", "seq": seq, "ok": ok, "text": text }));
+                let generation = calcs.fetch_add(1, Ordering::SeqCst) + 1;
+                let calcs = calcs.clone();
+                std::thread::spawn(move || {
+                    let stale = || calcs.load(Ordering::SeqCst) != generation;
+                    if let Some(a) = calc::eval(&q, &stale) {
+                        emit(json!({
+                            "re": "calc",
+                            "seq": seq,
+                            "ok": a.ok,
+                            "text": a.text,
+                            "math": a.math,
+                            "approx": a.approx,
+                            "value": a.value,
+                            "exact": a.exact,
+                            "tex": a.tex,
+                        }));
+                    }
+                });
             }
             Request::Files { seq, scope, q } => {
                 let generation = search.fetch_add(1, Ordering::SeqCst) + 1;

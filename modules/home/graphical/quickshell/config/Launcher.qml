@@ -10,7 +10,7 @@ import Quickshell.Widgets
 
 // The launcher, opened with super: apps, and through a prefix the other modes, shown as a
 // chip in front of the search field (backspace on an empty field drops it again):
-//   >cmd   run a shell command          =1+2   calculator (enter copies the result)
+//   >cmd   run a shell command          =1+2   qalc (enter copies, shift+enter opens Qalculate)
 //   ~      files in home                d~     files in ~/Downloads, newest first
 //   /      files anywhere               "      clipboard history (also super+v)
 //   *      1Password (also super+shift+p)
@@ -159,7 +159,12 @@ PanelWindow {
         } else if (d.re === "calc" && d.seq === calcSeq) {
             calcResult = {
                 ok: d.ok,
-                text: d.text
+                text: d.text,
+                math: d.math,
+                approx: d.approx,
+                value: d.value,
+                exact: d.exact,
+                tex: d.tex
             };
         } else if (d.re === "files" && d.seq === filesSeq) {
             files = d.files;
@@ -249,10 +254,17 @@ PanelWindow {
             close();
             Quickshell.execDetached(["uwsm-app", "--", "sh", "-c", cmd]);
         } else if (mode === "calc") {
+            // Shift opens it in Qalculate (history, plots, a window that stays), even unfinished.
+            if (shift) {
+                close();
+                Quickshell.execDetached(["uwsm-app", "--", "qalculate-qt"].concat(query.trim() ? ["--", query.trim()] : []));
+                return;
+            }
             if (!calcResult?.ok)
                 return;
             close();
-            Quickshell.clipboardText = calcResult.text;
+            // The decimal value; ctrl for the exact form (2π, √(2), 1/3), alt for it as LaTeX.
+            Quickshell.clipboardText = modifiers & Qt.AltModifier ? calcResult.tex : modifiers & Qt.ControlModifier ? calcResult.exact : calcResult.value;
         } else if (mode === "files") {
             actFile(item, modifiers);
         } else if (mode === "clip") {
@@ -420,7 +432,7 @@ PanelWindow {
         if (mode === "run")
             return [K(["↵"], "Run"), K(["esc"], "Close")];
         if (mode === "calc")
-            return [K(["↵"], "Copy result"), K(["esc"], "Close")];
+            return [K(["↵"], "Copy value"), K(["ctrl", "↵"], "Exact"), K(["alt", "↵"], "LaTeX"), K(["⇧", "↵"], "Qalculate")];
         return [K(["↑", "↓"], "Navigate"), K(["~"], "Files"), K(["\""], "Clipboard"), K(["*"], "Passwords"), K([">"], "Run"), K(["="], "Calc")];
     }
 
@@ -1027,14 +1039,40 @@ PanelWindow {
                             dim: true
                             text: root.query.trim() || " "
                         }
+                        // Typeset when qalc's LaTeX could be read, shrunk to fit; as text otherwise.
+                        Item {
+                            Layout.fillWidth: true
+                            implicitHeight: formula.visible ? formula.implicitHeight * formula.scale : resultText.implicitHeight
+
+                            Formula {
+                                id: formula
+                                visible: !!root.calcResult?.math
+                                node: root.calcResult?.math ?? ""
+                                size: 34
+                                color: Theme.white
+                                scale: Math.min(1, parent.width / Math.max(1, implicitWidth))
+                                transformOrigin: Item.TopLeft
+                            }
+                            UiText {
+                                id: resultText
+                                width: parent.width
+                                visible: !formula.visible
+                                mono: true
+                                text: root.calcResult?.text ?? ""
+                                color: root.calcResult?.ok ? Theme.white : Qt.rgba(235 / 255, 243 / 255, 242 / 255, 0.5)
+                                font.pixelSize: 32
+                                font.weight: Font.Medium
+                                font.letterSpacing: -0.6
+                            }
+                        }
+                        // The decimal value, when the result is exact (2π ≈ 6,283185307).
                         UiText {
                             Layout.fillWidth: true
+                            visible: !!root.calcResult?.approx
                             mono: true
-                            text: root.calcResult?.text ?? ""
-                            color: root.calcResult?.ok ? Theme.white : Qt.rgba(235 / 255, 243 / 255, 242 / 255, 0.5)
-                            font.pixelSize: 32
-                            font.weight: Font.Medium
-                            font.letterSpacing: -0.6
+                            dim: true
+                            // Equations come with their own: "x ≈ 1,414213562 or x ≈ −1,414213562".
+                            text: (root.calcResult?.approx ?? "").includes("≈") ? root.calcResult.approx : "≈ " + (root.calcResult?.approx ?? "")
                         }
                     }
                     KeyHint {

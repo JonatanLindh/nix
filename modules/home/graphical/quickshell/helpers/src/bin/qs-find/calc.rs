@@ -1,285 +1,170 @@
-//! The launcher's `=` calculator: + - * / % ^ (or **), parentheses, factorial (!), the
-//! constants pi, tau and e, and functions like sqrt(2) or sin(pi/2) (radians). A number
-//! straight before a name or a parenthesis multiplies: 2pi, 3(4 + 1).
+//! The launcher's `=` calculator: Qalculate's `qalc`, so it answers what the Qalculate app
+//! does: units and currencies (`5 km/h to m/s`, `10 USD to SEK`), dates (`today + 30 days`),
+//! equations (`x^2 = 2`, `solve(...)`), and plain arithmetic.
+//!
+//! Three runs per expression, side by side (about 25 ms): the exact result, which keeps
+//! symbols and fractions (`x = 2πn + π / 2`), once as text and once as LaTeX (typeset by the
+//! launcher, see tex.rs), and the decimal value, for copying. Typed decimals stay decimals
+//! (`1.5`, not `1 + 1/2`). Numbers read 1 222 333.5. All stop when a newer expression comes in,
+//! or after a few seconds (`100000!` takes a while).
 
-type Function = fn(f64) -> f64;
+use serde_json::Value;
+use std::io::Read;
+use std::process::{Child, Command, Stdio};
+use std::time::{Duration, Instant};
 
-const FUNCTIONS: &[(&str, Function)] = &[
-    ("sqrt", f64::sqrt),
-    ("cbrt", f64::cbrt),
-    ("abs", f64::abs),
-    ("exp", f64::exp),
-    ("ln", f64::ln),
-    ("log", f64::log10),
-    ("log10", f64::log10),
-    ("log2", f64::log2),
-    ("sin", f64::sin),
-    ("cos", f64::cos),
-    ("tan", f64::tan),
-    ("asin", f64::asin),
-    ("acos", f64::acos),
-    ("atan", f64::atan),
-    ("sinh", f64::sinh),
-    ("cosh", f64::cosh),
-    ("tanh", f64::tanh),
-    ("floor", f64::floor),
-    ("ceil", f64::ceil),
-    ("round", f64::round),
-];
+const TIMEOUT: Duration = Duration::from_secs(3);
+const FORMAT: [&str; 4] = ["-s", "decimal comma 0", "-s", "digit grouping 1"];
 
-const CONSTANTS: &[(&str, f64)] = &[
-    ("pi", std::f64::consts::PI),
-    ("π", std::f64::consts::PI),
-    ("tau", std::f64::consts::TAU),
-    ("e", std::f64::consts::E),
-];
-
-#[derive(Clone, PartialEq, Debug)]
-enum Token {
-    Num(f64),
-    Name(String),
-    Op(char),
+pub struct Answer {
+    pub ok: bool,
+    /// The exact form, or why there is no answer.
+    pub text: String,
+    /// The exact form typeset (tex.rs), when qalc's LaTeX could be read.
+    pub math: Option<Value>,
+    /// The decimal value, when it reads differently from `text`.
+    pub approx: String,
+    /// What to copy: the decimal value (whether or not it's shown), the exact form, LaTeX.
+    pub value: String,
+    pub exact: String,
+    pub tex: String,
 }
 
-fn tokens(src: &str) -> Option<Vec<Token>> {
-    let mut out = Vec::new();
-    let chars: Vec<char> = src.chars().collect();
-    let mut i = 0;
-    while i < chars.len() {
-        let c = chars[i];
-        if c.is_whitespace() {
-            i += 1;
-        } else if c.is_ascii_digit() || c == '.' {
-            let start = i;
-            while i < chars.len() && (chars[i].is_ascii_digit() || chars[i] == '.') {
-                i += 1;
+fn spawn(settings: &[&str], expr: &str) -> Option<Child> {
+    Command::new("qalc")
+        .arg("-t")
+        .args(FORMAT)
+        .args(settings)
+        .args(["--", expr])
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .ok()
+}
+
+/// The run's one-line output, or None if it failed.
+fn output(mut child: Child) -> Option<String> {
+    let ok = child.wait().ok()?.success();
+    let mut out = String::new();
+    child.stdout.take()?.read_to_string(&mut out).ok()?;
+    let text = (out.lines())
+        .map(str::trim)
+        .filter(|l| !l.is_empty())
+        .collect::<Vec<_>>()
+        .join("  ");
+    (ok && !text.is_empty()).then_some(text)
+}
+
+fn fail(text: &str) -> Answer {
+    Answer {
+        ok: false,
+        text: text.into(),
+        math: None,
+        approx: String::new(),
+        value: String::new(),
+        exact: String::new(),
+        tex: String::new(),
+    }
+}
+
+/// For copying: no grouping between digits (1222333.5), plain spaces elsewhere (1.5 m/s).
+fn plain(s: &str) -> String {
+    let chars: Vec<char> = s.chars().collect();
+    let mut out = String::new();
+    for (i, &c) in chars.iter().enumerate() {
+        if matches!(c, '\u{2009}' | '\u{202f}' | '\u{a0}') {
+            let digit = |j: Option<&char>| j.is_some_and(char::is_ascii_digit);
+            if !(i > 0 && digit(chars.get(i - 1)) && digit(chars.get(i + 1))) {
+                out.push(' ');
             }
-            // 1e3, 2.5E-4; but "2e" alone is 2 times e.
-            if i < chars.len() && (chars[i] == 'e' || chars[i] == 'E') {
-                let mut j = i + 1;
-                if j < chars.len() && (chars[j] == '+' || chars[j] == '-') {
-                    j += 1;
-                }
-                if j < chars.len() && chars[j].is_ascii_digit() {
-                    while j < chars.len() && chars[j].is_ascii_digit() {
-                        j += 1;
-                    }
-                    i = j;
-                }
-            }
-            out.push(Token::Num(
-                chars[start..i].iter().collect::<String>().parse().ok()?,
-            ));
-        } else if c.is_alphabetic() {
-            let start = i;
-            while i < chars.len() && (chars[i].is_alphanumeric()) {
-                i += 1;
-            }
-            out.push(Token::Name(
-                chars[start..i].iter().collect::<String>().to_lowercase(),
-            ));
         } else {
-            let op = match c {
-                '×' | '·' => '*',
-                '÷' => '/',
-                '−' => '-',
-                '*' if chars.get(i + 1) == Some(&'*') => {
-                    i += 1;
-                    '^'
-                }
-                '+' | '-' | '*' | '/' | '%' | '^' | '(' | ')' | '!' => c,
-                _ => return None,
-            };
-            out.push(Token::Op(op));
-            i += 1;
+            out.push(c);
         }
     }
-    Some(out)
+    out
 }
 
-struct Parser {
-    tokens: Vec<Token>,
-    at: usize,
+/// A number typed with a decimal point, like 1.5 or .25.
+fn has_decimal(expr: &str) -> bool {
+    let b = expr.as_bytes();
+    (0..b.len()).any(|i| b[i] == b'.' && b.get(i + 1).is_some_and(u8::is_ascii_digit))
 }
 
-impl Parser {
-    fn peek(&self) -> Option<&Token> {
-        self.tokens.get(self.at)
+/// None when a newer expression took over.
+pub fn eval(expr: &str, stale: &dyn Fn() -> bool) -> Option<Answer> {
+    let expr = expr.trim();
+    if expr.is_empty() {
+        return Some(fail("Type an expression"));
     }
-
-    fn eat(&mut self, op: char) -> bool {
-        if self.peek() == Some(&Token::Op(op)) {
-            self.at += 1;
-            true
-        } else {
-            false
-        }
-    }
-
-    // expr := term (('+' | '-') term)*
-    fn expr(&mut self) -> Option<f64> {
-        let mut v = self.term()?;
-        loop {
-            if self.eat('+') {
-                v += self.term()?;
-            } else if self.eat('-') {
-                v -= self.term()?;
-            } else {
-                return Some(v);
-            }
-        }
-    }
-
-    // term := unary (('*' | '/' | '%' | nothing) unary)*
-    fn term(&mut self) -> Option<f64> {
-        let mut v = self.unary()?;
-        loop {
-            if self.eat('*') {
-                v *= self.unary()?;
-            } else if self.eat('/') {
-                v /= self.unary()?;
-            } else if self.eat('%') {
-                v %= self.unary()?;
-            } else if matches!(
-                self.peek(),
-                Some(Token::Num(_) | Token::Name(_) | Token::Op('('))
-            ) {
-                v *= self.unary()?;
-            } else {
-                return Some(v);
-            }
-        }
-    }
-
-    // unary := ('-' | '+') unary | power; so -2^2 is -4, and 2^-1 works.
-    fn unary(&mut self) -> Option<f64> {
-        if self.eat('-') {
-            return Some(-self.unary()?);
-        }
-        if self.eat('+') {
-            return self.unary();
-        }
-        self.power()
-    }
-
-    // power := postfix ('^' unary)?, right-associative.
-    fn power(&mut self) -> Option<f64> {
-        let base = self.postfix()?;
-        if self.eat('^') {
-            return Some(base.powf(self.unary()?));
-        }
-        Some(base)
-    }
-
-    // postfix := primary '!'*
-    fn postfix(&mut self) -> Option<f64> {
-        let mut v = self.primary()?;
-        while self.eat('!') {
-            if v < 0.0 || v.fract() != 0.0 || v > 170.0 {
-                return None;
-            }
-            v = (1..=v as u64).map(|n| n as f64).product();
-        }
-        Some(v)
-    }
-
-    fn primary(&mut self) -> Option<f64> {
-        match self.peek()?.clone() {
-            Token::Num(n) => {
-                self.at += 1;
-                Some(n)
-            }
-            Token::Op('(') => {
-                self.at += 1;
-                let v = self.expr()?;
-                // A missing ")" at the very end is forgiven, as you'd still be typing it.
-                if !self.eat(')') && self.peek().is_some() {
-                    return None;
-                }
-                Some(v)
-            }
-            Token::Name(name) => {
-                self.at += 1;
-                if let Some((_, f)) = FUNCTIONS.iter().find(|(n, _)| *n == name) {
-                    // sqrt(2), or sqrt 2 like on a calculator.
-                    return Some(f(self.power()?));
-                }
-                CONSTANTS.iter().find(|(n, _)| *n == name).map(|(_, v)| *v)
-            }
-            Token::Op(_) => None,
-        }
-    }
-}
-
-pub fn eval(src: &str) -> Option<f64> {
-    let mut p = Parser {
-        tokens: tokens(src)?,
-        at: 0,
+    // "auto" writes 1.5 as 1 + 1/2; "exact" only uses fractions where decimals can't be exact.
+    let fractions = if has_decimal(expr) {
+        "fractions exact"
+    } else {
+        "fractions auto"
     };
-    let v = p.expr()?;
-    (p.at == p.tokens.len() && v.is_finite()).then_some(v)
-}
-
-/// 12 significant digits, so 0.1 + 0.2 is 0.3; exponent notation when very large or small.
-pub fn format(v: f64) -> String {
-    let v: f64 = format!("{v:.11e}").parse().unwrap_or(v);
-    if v == 0.0 {
-        return "0".into();
+    let exact_settings = ["-s", "approximation exact", "-s", fractions];
+    let latex_settings = ["-latex", "-s", "approximation exact", "-s", fractions];
+    let mut runs: Vec<Child> = Vec::new();
+    for settings in [&exact_settings[..], &latex_settings[..], &[]] {
+        match spawn(settings, expr) {
+            Some(c) => runs.push(c),
+            None => return Some(fail("qalc isn't installed")),
+        }
     }
-    if v.abs() >= 1e15 || v.abs() < 1e-7 {
-        return format!("{v:e}");
+    let start = Instant::now();
+    loop {
+        if runs.iter_mut().all(|c| !matches!(c.try_wait(), Ok(None))) {
+            break;
+        }
+        if stale() || start.elapsed() > TIMEOUT {
+            for c in &mut runs {
+                let _ = c.kill();
+                let _ = c.wait();
+            }
+            return (!stale()).then(|| fail("Takes too long"));
+        }
+        std::thread::sleep(Duration::from_millis(5));
     }
-    format!("{v}")
+    let mut outs = runs.into_iter().map(output);
+    let (exact, latex, approx) = (outs.next()?, outs.next()?, outs.next()?);
+    let (text, approx) = match (exact, approx) {
+        (Some(e), Some(a)) => (e, a),
+        (Some(t), None) | (None, Some(t)) => (t.clone(), t),
+        (None, None) => return Some(fail("Not an expression")),
+    };
+    // "1/2 = 0.5" already shows the value.
+    let shown = if approx == text || text.ends_with(&format!("= {approx}")) {
+        String::new()
+    } else {
+        approx.clone()
+    };
+    Some(Answer {
+        ok: true,
+        // A tree that's only text adds nothing over qalc's text, which rounds the way qalc
+        // shows numbers (LaTeX gets every digit: 99.17967008 SEK for 99.1797 SEK).
+        math: (latex.as_deref().and_then(crate::tex::parse)).filter(|m| !m.is_string()),
+        tex: latex.as_deref().map(crate::tex::clean).unwrap_or_default(),
+        value: plain(&approx),
+        exact: plain(&text),
+        approx: shown,
+        text,
+    })
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
-    fn calc(s: &str) -> Option<String> {
-        eval(s).map(format)
+    #[test]
+    fn decimals() {
+        assert!(super::has_decimal("1.5 + 2"));
+        assert!(super::has_decimal(".25"));
+        assert!(!super::has_decimal("1/2"));
+        assert!(!super::has_decimal("5 km/h to m/s"));
     }
 
     #[test]
-    fn arithmetic() {
-        assert_eq!(calc("1+2*3").as_deref(), Some("7"));
-        assert_eq!(calc("(1+2)*3").as_deref(), Some("9"));
-        assert_eq!(calc("2^10").as_deref(), Some("1024"));
-        assert_eq!(calc("2**3**2").as_deref(), Some("512"));
-        assert_eq!(calc("-2^2").as_deref(), Some("-4"));
-        assert_eq!(calc("2^-1").as_deref(), Some("0.5"));
-        assert_eq!(calc("0.1+0.2").as_deref(), Some("0.3"));
-        assert_eq!(calc("7 % 3").as_deref(), Some("1"));
-        assert_eq!(calc("5!").as_deref(), Some("120"));
-        assert_eq!(calc("1e3 + 1").as_deref(), Some("1001"));
-        assert_eq!(calc("3 × 4 ÷ 2").as_deref(), Some("6"));
-    }
-
-    #[test]
-    fn names() {
-        assert_eq!(calc("2pi").as_deref(), Some("6.28318530718"));
-        assert_eq!(calc("sqrt(16)").as_deref(), Some("4"));
-        assert_eq!(calc("sqrt 16").as_deref(), Some("4"));
-        assert_eq!(calc("sin(pi/2)").as_deref(), Some("1"));
-        assert_eq!(calc("3(4+1)").as_deref(), Some("15"));
-        assert_eq!(calc("2e").as_deref(), Some("5.43656365692"));
-        assert_eq!(calc("log 1000").as_deref(), Some("3"));
-        assert_eq!(calc("(1+2").as_deref(), Some("3"));
-    }
-
-    #[test]
-    fn rejects() {
-        assert_eq!(calc("hello"), None);
-        assert_eq!(calc("1/0"), None);
-        assert_eq!(calc("1 +"), None);
-        assert_eq!(calc("(-1)!"), None);
-        assert_eq!(calc("2)"), None);
-    }
-
-    #[test]
-    fn formats() {
-        assert_eq!(format(1e21), "1e21");
-        assert_eq!(format(-0.0), "0");
-        assert_eq!(format(123456.789), "123456.789");
+    fn copying() {
+        assert_eq!(super::plain("1\u{202f}222\u{202f}333.5"), "1222333.5");
+        assert_eq!(super::plain("1.388\u{2009}888\u{202f}m/s"), "1.388888 m/s");
     }
 }

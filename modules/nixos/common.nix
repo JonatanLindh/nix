@@ -161,6 +161,7 @@
       vista-fonts
       inter
       geist-font # the Quickshell bar (Geist + Geist Mono)
+      newcomputermodern # the launcher calculator's typeset results (New Computer Modern Math, as in Typst)
       nerd-fonts.symbols-only
       nerd-fonts.fira-code
       nerd-fonts.jetbrains-mono
