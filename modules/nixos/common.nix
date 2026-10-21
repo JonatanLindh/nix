@@ -35,6 +35,10 @@
     };
   };
 
+  # Full magic SysRq (default 16 only allows sync), so REISUB works when the
+  # session is wedged.
+  boot.kernel.sysctl."kernel.sysrq" = 1;
+
   # Set your time zone.
   time.timeZone = "Europe/Stockholm";
 

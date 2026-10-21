@@ -18,5 +18,10 @@
     };
   };
 
+  # Only want kinit/klist, not Kerberos logins. Left on, this adds pam_krb5 +
+  # pam_ccreds to every PAM service, and pam_ccreds' helper fork deadlocks
+  # hyprlock on a wrong password (child calls exit() in a threaded process).
+  security.pam.krb5.enable = false;
+
   environment.systemPackages = [ pkgs.krb5 ];
 }

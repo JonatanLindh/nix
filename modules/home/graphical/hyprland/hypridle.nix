@@ -6,7 +6,7 @@
     settings = {
       general = {
         lock_cmd = "pidof hyprlock || uwsm-app -- hyprlock";
-        after_sleep_cmd = "hyprctl dispatch dpms on";
+        after_sleep_cmd = "hyprctl dispatch 'hl.dsp.dpms({ action = \"on\" })'";
         before_sleep_cmd = "loginctl lock-session";
       };
 
@@ -24,8 +24,8 @@
 
         {
           timeout = 330;
-          on-timeout = "hyprctl dispatch dpms off";
-          on-resume = "hyprctl dispatch dpms on && brightnessctl -r";
+          on-timeout = "hyprctl dispatch 'hl.dsp.dpms({ action = \"off\" })'";
+          on-resume = "hyprctl dispatch 'hl.dsp.dpms({ action = \"on\" })' && brightnessctl -r";
         }
 
         {
