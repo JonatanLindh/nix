@@ -8,7 +8,8 @@ import Quickshell.Wayland
 
 // A glass pill (icon, 5% steps, number) at the bottom of the focused monitor for a moment
 // after the volume, mute or brightness changes. Only reacts to changes of a value it has already seen, so
-// startup, reloads and switching the output device stay quiet. Takes no input at all.
+// startup, reloads and switching the output device stay quiet. Stays out of the way while this
+// bar's panel with the matching slider (Sound, Battery) is open. Takes no input at all.
 // qmllint disable uncreatable-type
 PanelWindow {
     id: root
@@ -19,13 +20,20 @@ PanelWindow {
     // Changes are ignored until startup has settled, and for a moment after the sink changes
     // (a new default device, EasyEffects relinking), since those jump the volume too.
     property bool armed: false
+    // The bar's open panel, to tell when the real slider is already on screen.
+    property string panel: ""
+    readonly property bool covered: covers(kind)
     readonly property bool focused: Hyprland.focusedMonitor !== null && Hyprland.monitorFor(screen) === Hyprland.focusedMonitor
 
     readonly property bool mute: kind === "vol" && Audio.muted
     readonly property int percent: kind === "vol" ? Audio.volume : Brightness.percent
 
+    function covers(what) {
+        return what === "vol" ? panel === "vol" : panel === "pwr" && Brightness.available;
+    }
+
     function show(what) {
-        if (!armed)
+        if (!armed || covers(what))
             return;
         kind = what;
         shown = true;
@@ -37,7 +45,7 @@ PanelWindow {
         arm.restart();
     }
 
-    visible: shown && focused
+    visible: shown && focused && !covered
     // Anchored to the bottom edge only, so the compositor centres it horizontally.
     anchors.bottom: true
     // qmllint disable unqualified unresolved-type

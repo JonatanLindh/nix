@@ -368,6 +368,7 @@ PanelWindow {
 
     Osd {
         screen: bar.screen
+        panel: bar.panel
     }
 
     CalendarPanel {
