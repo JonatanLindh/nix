@@ -8,10 +8,10 @@ use std::{
 use anyhow::Context;
 
 use super::{Outcome, exec};
-use crate::files::{name, out_dir, plural, stem, unique};
+use crate::files::{name, plural, results_dir, stem, unique};
 
 pub async fn extract(files: &[PathBuf]) -> anyhow::Result<Outcome> {
-    let dir = out_dir()?;
+    let dir = results_dir()?;
     let mut made = Vec::new();
     for file in files {
         let folder = unique(&dir, &stem(file));
@@ -36,7 +36,7 @@ pub async fn extract(files: &[PathBuf]) -> anyhow::Result<Outcome> {
 }
 
 pub async fn archive(files: &[PathBuf]) -> anyhow::Result<Outcome> {
-    let out = unique(&out_dir()?, &format!("shelf-{}-files.zip", files.len()));
+    let out = unique(&results_dir()?, &format!("shelf-{}-files.zip", files.len()));
     zip_to(files, &out).await?;
     Ok(Outcome::made(
         format!("Packed {}", plural(files.len(), "file")),

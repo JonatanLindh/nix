@@ -41,6 +41,7 @@ Singleton {
     readonly property color mic: "#ffa94d"
     readonly property color screen: "#b79cff"
     readonly property color online: "#3ddc78"
+    readonly property color bluetooth: "#5aa9ff"
 
     // Type.
     readonly property string font: "Geist"

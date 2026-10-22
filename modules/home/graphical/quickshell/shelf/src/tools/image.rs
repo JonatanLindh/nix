@@ -10,7 +10,7 @@ use anyhow::bail;
 use super::{Outcome, exec, output};
 use crate::{
     actions::{CONVERT_FORMATS, RESIZE_SIZES},
-    files::{ext, out_dir, plural, stem, unique},
+    files::{ext, plural, results_dir, stem, unique},
 };
 
 /// The input as ImageMagick should read it: only the first frame of an animated GIF,
@@ -27,7 +27,7 @@ pub async fn convert(files: &[PathBuf], format: &str) -> anyhow::Result<Outcome>
     let Some(&(format, label)) = CONVERT_FORMATS.iter().find(|(id, _)| *id == format) else {
         bail!("Pick a format to convert to");
     };
-    let dir = out_dir()?;
+    let dir = results_dir()?;
     let mut made = Vec::new();
     for file in files {
         let out = unique(&dir, &format!("{}.{format}", stem(file)));
@@ -49,7 +49,7 @@ pub async fn resize(files: &[PathBuf], size: &str) -> anyhow::Result<Outcome> {
         Some(pct) => (size.to_string(), format!("{pct}pct")),
         None => (format!("{size}x>"), format!("{size}w")),
     };
-    let dir = out_dir()?;
+    let dir = results_dir()?;
     let mut made = Vec::new();
     for file in files {
         let out = unique(&dir, &format!("{}-{suffix}.{}", stem(file), ext(file)));
@@ -73,7 +73,7 @@ pub async fn resize(files: &[PathBuf], size: &str) -> anyhow::Result<Outcome> {
 }
 
 pub async fn strip(files: &[PathBuf]) -> anyhow::Result<Outcome> {
-    let dir = out_dir()?;
+    let dir = results_dir()?;
     let mut made = Vec::new();
     for file in files {
         let out = unique(&dir, &format!("{}-clean.{}", stem(file), ext(file)));

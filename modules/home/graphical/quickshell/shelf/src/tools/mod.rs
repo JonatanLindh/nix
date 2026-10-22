@@ -27,6 +27,9 @@ pub struct Outcome {
     pub message: String,
     /// New files/folders, to be added to the shelf.
     pub outputs: Vec<String>,
+    /// Items the UI should select (when not `outputs`).
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub select: Vec<String>,
     /// Text the UI should put on the clipboard.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub copy: Option<String>,
@@ -84,6 +87,7 @@ pub async fn run(action: &str, opt: &str, files: &[PathBuf]) -> anyhow::Result<O
         "gif" => video::gif(files).await,
         "extract" => archive::extract(files).await,
         "archive" => archive::archive(files).await,
+        "open" => open(files),
         "localsend" => localsend(files).await,
         "taildrop" => taildrop(files, opt).await,
         "copy-paths" => Ok(Outcome {
@@ -98,6 +102,30 @@ pub async fn run(action: &str, opt: &str, files: &[PathBuf]) -> anyhow::Result<O
         }),
         _ => bail!("Unknown action “{action}”"),
     }
+}
+
+fn open(files: &[PathBuf]) -> anyhow::Result<Outcome> {
+    for f in files {
+        let mut cmd = if which("uwsm-app") {
+            let mut c = Command::new("uwsm-app");
+            c.args(["--", "xdg-open"]);
+            c
+        } else {
+            Command::new("xdg-open")
+        };
+        let mut child = cmd
+            .arg(f)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .map_err(|e| not_found("xdg-open", e))?;
+        tokio::spawn(async move { child.wait().await });
+    }
+    Ok(Outcome::said(format!(
+        "Opened {}",
+        plural(files.len(), "file")
+    )))
 }
 
 async fn localsend(files: &[PathBuf]) -> anyhow::Result<Outcome> {

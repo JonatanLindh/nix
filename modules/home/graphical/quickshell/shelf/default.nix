@@ -2,7 +2,7 @@
 
 # The drag shelf's backend: a session D-Bus service (org.jonatanlindh.Shelf) that converts,
 # packs and shares files for the shelf in the bar, plus the `shelf` CLI Quickshell calls.
-# Results go to ~/Downloads/Shelf. Lives outside config/ so the hot-reloaded dir stays QML only.
+# Results live in ~/.local/state/shelf/files until they leave the shelf. Lives outside config/ so the hot-reloaded dir stays QML only.
 let
   shelf = pkgs.callPackage ./package.nix { };
 in

@@ -1,15 +1,18 @@
 //! `shelf`: the drag shelf's backend. `shelf daemon` serves org.jonatanlindh.Shelf on the
-//! session bus and does the work; the other subcommands are a thin CLI for Quickshell that
-//! print JSON on stdout.
+//! session bus, holds the shelf's items and does the work; the other subcommands are a thin
+//! CLI (for Quickshell, scripts and keybinds) that print JSON on stdout.
 
 mod actions;
 mod daemon;
 mod files;
+mod hand;
 mod http;
 mod jobs;
 mod peers;
 mod qr;
+mod store;
 mod tools;
+mod watch;
 
 use clap::{Parser, Subcommand};
 use futures_util::StreamExt;
@@ -26,6 +29,20 @@ struct Cli {
 enum Command {
     /// Serve org.jonatanlindh.Shelf on the session bus.
     Daemon,
+    /// Put FILES on the shelf.
+    Add {
+        #[arg(required = true)]
+        files: Vec<String>,
+    },
+    /// Take FILES off the shelf.
+    Remove {
+        #[arg(required = true)]
+        files: Vec<String>,
+    },
+    /// Empty the shelf.
+    Clear,
+    /// Print the shelf's items as JSON.
+    List,
     /// Print the actions that apply to all of FILES, as JSON.
     Actions { files: Vec<String> },
     /// Run ACTION on FILES (through the daemon) and print the result as JSON.
@@ -42,7 +59,7 @@ enum Command {
     Jobs,
     /// Print Taildrop targets (your own tailnet devices) as JSON.
     Peers,
-    /// Print share updates as JSON lines until killed.
+    /// Print the items, then item and share updates, as JSON lines until killed.
     Watch,
 }
 
@@ -75,14 +92,28 @@ async fn run(command: Command) -> anyhow::Result<()> {
             println!("{}", serde_json::to_string(&peers::list().await?)?);
             Ok(())
         }
+        Command::Add { files } => {
+            daemon::proxy().await?.add(absolute(&files)?).await?;
+            println!("{}", json!({ "ok": true }));
+            Ok(())
+        }
+        Command::Remove { files } => {
+            daemon::proxy().await?.remove(absolute(&files)?).await?;
+            println!("{}", json!({ "ok": true }));
+            Ok(())
+        }
+        Command::Clear => {
+            daemon::proxy().await?.clear().await?;
+            println!("{}", json!({ "ok": true }));
+            Ok(())
+        }
+        Command::List => {
+            println!("{}", daemon::proxy().await?.items().await?);
+            Ok(())
+        }
         Command::Run { action, opt, files } => {
-            // The daemon has its own working directory.
-            let files = files
-                .iter()
-                .map(|f| std::path::absolute(f).map(|p| p.to_string_lossy().into_owned()))
-                .collect::<Result<Vec<_>, _>>()?;
             let proxy = daemon::proxy().await?;
-            println!("{}", proxy.run(&action, &opt, files).await?);
+            println!("{}", proxy.run(&action, &opt, absolute(&files)?).await?);
             Ok(())
         }
         Command::Cancel { job } => {
@@ -96,15 +127,36 @@ async fn run(command: Command) -> anyhow::Result<()> {
         }
         Command::Watch => {
             let proxy = daemon::proxy().await?;
-            let mut changes = proxy.receive_job_changed().await?;
-            while let Some(signal) = changes.next().await {
-                let args = signal.args()?;
-                println!(
-                    "{}",
-                    json!({ "job": args.job, "state": args.state, "message": args.message })
-                );
+            // Subscribed before reading the items, so no change falls in between.
+            let mut jobs = proxy.receive_job_changed().await?;
+            let mut items = proxy.receive_items_changed().await?;
+            let current: serde_json::Value = serde_json::from_str(&proxy.items().await?)?;
+            println!("{}", json!({ "items": current, "reason": "load" }));
+            loop {
+                tokio::select! {
+                    Some(signal) = jobs.next() => {
+                        let args = signal.args()?;
+                        println!(
+                            "{}",
+                            json!({ "job": args.job, "state": args.state, "message": args.message })
+                        );
+                    }
+                    Some(signal) = items.next() => {
+                        let args = signal.args()?;
+                        let list: serde_json::Value = serde_json::from_str(args.items)?;
+                        println!("{}", json!({ "items": list, "reason": args.reason }));
+                    }
+                    else => return Ok(()),
+                }
             }
-            Ok(())
         }
     }
+}
+
+/// The daemon has its own working directory, so paths go to it absolute.
+fn absolute(files: &[String]) -> anyhow::Result<Vec<String>> {
+    Ok(files
+        .iter()
+        .map(|f| std::path::absolute(f).map(|p| p.to_string_lossy().into_owned()))
+        .collect::<Result<_, _>>()?)
 }

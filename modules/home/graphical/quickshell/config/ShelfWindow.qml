@@ -124,8 +124,11 @@ PanelWindow {
                     font.weight: Font.DemiBold
                 }
                 TextButton {
+                    readonly property int temps: Shelf.items.filter(i => i.temp).length
+
                     visible: Shelf.count > 0
-                    text: "Clear"
+                    // Results are deleted with the rest; say so.
+                    text: temps ? `Clear · deletes ${temps}` : "Clear"
                     onClicked: Shelf.clear()
                 }
                 CircleButton {
@@ -696,17 +699,21 @@ PanelWindow {
                 text: row.modelData.name
                 font.pixelSize: 13
             }
+            // A result: the shelf's own file, deleted when it leaves the shelf (drag it out to
+            // keep it).
             Rectangle {
-                visible: row.modelData.fresh
-                implicitWidth: newText.implicitWidth + 14
+                visible: row.modelData.temp
+                implicitWidth: tempText.implicitWidth + 14
                 implicitHeight: 18
                 radius: 9
-                color: Theme.accent
+                color: Theme.fill
+                border.width: 1
+                border.color: Theme.glassBorder
                 UiText {
-                    id: newText
+                    id: tempText
                     anchors.centerIn: parent
-                    text: "New"
-                    color: Theme.accentInk
+                    text: "Temp"
+                    color: Theme.textDim
                     font.pixelSize: 10
                     font.weight: Font.DemiBold
                 }
@@ -714,8 +721,9 @@ PanelWindow {
             CircleButton {
                 opacity: row.containsMouse ? 1 : 0
                 size: 22
-                iconSize: 11
-                icon: "close"
+                iconSize: row.modelData.temp ? 13 : 11
+                icon: row.modelData.temp ? "trash" : "close"
+                hoverIconColor: row.modelData.temp ? Theme.warnText : Theme.text
                 onClicked: Shelf.remove(row.modelData.path)
             }
         }

@@ -8,7 +8,7 @@ use std::{
 use anyhow::Context;
 
 use super::{Outcome, exec, output, size_of};
-use crate::files::{human_size, out_dir, plural, runtime_dir, stem, token, unique};
+use crate::files::{human_size, plural, results_dir, runtime_dir, stem, token, unique};
 
 /// Discord and friends cap uploads at 10 MB; aim a little under for container overhead.
 const TARGET_BYTES: f64 = 9.5e6;
@@ -36,7 +36,7 @@ async fn duration(file: &Path) -> anyhow::Result<f64> {
 }
 
 pub async fn shrink(files: &[PathBuf]) -> anyhow::Result<Outcome> {
-    let dir = out_dir()?;
+    let dir = results_dir()?;
     let mut made = Vec::new();
     for file in files {
         let secs = duration(file).await?;
@@ -103,7 +103,7 @@ pub async fn shrink(files: &[PathBuf]) -> anyhow::Result<Outcome> {
 }
 
 pub async fn gif(files: &[PathBuf]) -> anyhow::Result<Outcome> {
-    let dir = out_dir()?;
+    let dir = results_dir()?;
     let mut made = Vec::new();
     for file in files {
         let out = unique(&dir, &format!("{}.gif", stem(file)));

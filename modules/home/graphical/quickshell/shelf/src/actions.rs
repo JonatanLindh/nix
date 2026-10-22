@@ -2,7 +2,7 @@
 
 use serde::Serialize;
 
-use crate::files::{Kind, kind_of};
+use crate::files::{Kind, in_dir, kind_of, results_path};
 
 #[derive(Serialize, Debug)]
 pub struct Action {
@@ -69,6 +69,9 @@ pub fn for_files(files: &[String]) -> Vec<Action> {
     let all = |k: Kind| kinds.iter().all(|&x| x == k);
     let mut out = Vec::new();
 
+    if n == 1 {
+        out.push(action("open", "Open", "open"));
+    }
     if all(Kind::Image) {
         out.push(Action {
             options: choices("Convert to", CONVERT_FORMATS),
@@ -97,6 +100,15 @@ pub fn for_files(files: &[String]) -> Vec<Action> {
     }
     if n >= 2 {
         out.push(action("archive", "Archive", "archive"));
+    }
+    // Hands the files to the shelf: they become temp, deleted when they leave it.
+    let results = results_path().ok();
+    if !files.iter().any(|f| {
+        results
+            .as_deref()
+            .is_some_and(|d| in_dir(f.trim_end_matches('/'), d))
+    }) {
+        out.push(action("hand", "Hand to shelf", "inbox"));
     }
     out.push(action("funnel", "Funnel link", "link"));
     out.push(action("wormhole", "Wormhole", "wormhole"));
@@ -129,10 +141,12 @@ mod tests {
         assert_eq!(
             ids(&["/a/shot.PNG"]),
             [
+                "open",
                 "convert",
                 "resize",
                 "strip",
                 "ocr",
+                "hand",
                 "funnel",
                 "wormhole",
                 "localsend",
@@ -145,6 +159,7 @@ mod tests {
     #[test]
     fn merge_needs_two_pdfs() {
         assert!(!ids(&["/a.pdf"]).contains(&"merge"));
+        assert!(!ids(&["/a.pdf", "/b.pdf"]).contains(&"open"));
         let two = ids(&["/a.pdf", "/b.pdf"]);
         assert!(two.contains(&"merge") && two.contains(&"archive"));
     }
@@ -154,6 +169,12 @@ mod tests {
         let mixed = ids(&["/a.pdf", "/b.png"]);
         assert!(!mixed.contains(&"convert") && !mixed.contains(&"compress"));
         assert!(mixed.contains(&"archive"));
+    }
+
+    #[test]
+    fn no_hand_for_the_shelfs_own_files() {
+        let own = results_path().unwrap().join("a.png");
+        assert!(!ids(&[own.to_str().unwrap()]).contains(&"hand"));
     }
 
     #[test]

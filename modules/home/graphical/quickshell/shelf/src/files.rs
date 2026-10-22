@@ -3,7 +3,7 @@
 use std::{
     env,
     io::Read,
-    path::{Path, PathBuf},
+    path::{Component, Path, PathBuf},
 };
 
 use anyhow::Context;
@@ -69,12 +69,44 @@ pub fn name(file: &Path) -> String {
         .unwrap_or_default()
 }
 
-/// Results land in ~/Downloads/Shelf, where they're easy to find again.
-pub fn out_dir() -> anyhow::Result<PathBuf> {
-    let home = env::var_os("HOME").context("HOME isn't set")?;
-    let dir = PathBuf::from(home).join("Downloads").join("Shelf");
+/// $XDG_STATE_HOME/shelf: the saved items and the results.
+pub fn state_dir() -> anyhow::Result<PathBuf> {
+    let base = match env::var_os("XDG_STATE_HOME") {
+        Some(dir) => PathBuf::from(dir),
+        None => PathBuf::from(env::var_os("HOME").context("HOME isn't set")?).join(".local/state"),
+    };
+    Ok(base.join("shelf"))
+}
+
+/// Where results live: the shelf's own files, deleted once they're taken off it
+/// (`crate::store`). Keeping one means dragging it out somewhere.
+pub fn results_dir() -> anyhow::Result<PathBuf> {
+    let dir = results_path()?;
     std::fs::create_dir_all(&dir).with_context(|| format!("Can't create {}", dir.display()))?;
     Ok(dir)
+}
+
+/// `results_dir` without creating it.
+pub fn results_path() -> anyhow::Result<PathBuf> {
+    Ok(state_dir()?.join("files"))
+}
+
+/// Whether `path` is directly in `dir`, with nothing (`..`) that could climb out of it.
+pub fn in_dir(path: &str, dir: &Path) -> bool {
+    let p = Path::new(path);
+    p.components()
+        .all(|c| matches!(c, Component::RootDir | Component::Normal(_)))
+        && p.parent() == Some(dir)
+}
+
+/// Deletes a file, or a folder with everything in it. A symlink is removed itself, never
+/// what it points to.
+pub fn remove_path(path: &Path) -> std::io::Result<()> {
+    if std::fs::symlink_metadata(path)?.is_dir() {
+        std::fs::remove_dir_all(path)
+    } else {
+        std::fs::remove_file(path)
+    }
 }
 
 /// Scratch space for shares (zips sent by wormhole or served by funnel); gone on logout.

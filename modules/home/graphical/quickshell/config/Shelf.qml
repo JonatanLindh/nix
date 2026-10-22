@@ -6,13 +6,17 @@ import Quickshell.Hyprland
 import Quickshell.Io
 
 // The drag shelf: files parked for dragging into other apps, plus tools that work on them.
-// The tools run in the `shelf` daemon (../shelf, org.jonatanlindh.Shelf) through its CLI,
-// which prints JSON; its results land in ~/Downloads/Shelf and come back here as new
-// items. Without the daemon the shelf still holds and drags files.
+// The `shelf` daemon (../shelf, org.jonatanlindh.Shelf) owns the items and runs the tools;
+// this is its UI, talking to it through its CLI, which prints JSON. `shelf watch` keeps
+// `items` in sync, so `shelf add` from anywhere shows up here. Tool results are the
+// daemon's own files (~/.local/state/shelf/files), put on the shelf as new items and
+// deleted once they leave it; keeping one means dragging it out. Selection, which
+// monitor it's on and whether it's shown stay here.
 Singleton {
     id: root
 
-    // [{ path, name, kind, fresh }]; `fresh` marks results ("New").
+    // The daemon's items, [{ path, name, kind, temp }]; `temp` marks results, which the
+    // daemon deletes when they leave the shelf.
     property var items: []
     readonly property int count: items.length
     property bool shown: false
@@ -48,60 +52,48 @@ Singleton {
     property bool installed: false
     readonly property string bin: "shelf"
 
-    function kindOf(path) {
-        const name = path.split("/").pop().toLowerCase();
-        if (path.endsWith("/"))
-            return "folder";
-        if (/\.(mp4|mkv|webm|mov|avi|m4v)$/.test(name))
-            return "video";
-        if (/\.(png|jpe?g|gif|webp|avif|heic|heif|tiff?|bmp|svg)$/.test(name))
-            return "image";
-        if (/\.(zip|tar|gz|tgz|xz|txz|zst|bz2|7z|rar|iso)$/.test(name))
-            return "archive";
-        if (/\.(nix|lua|qml|js|ts|py|rs|go|c|h|cpp|sh|json|toml|ya?ml|html|css)$/.test(name))
-            return "code";
-        return "file";
-    }
-
-    function item(path, fresh) {
-        const clean = path.replace(/\/+$/, "") || "/";
-        return {
-            path: clean,
-            name: clean.split("/").pop(),
-            kind: kindOf(path),
-            fresh: !!fresh
-        };
-    }
-
     function say(text, error) {
         status = text;
         statusError = !!error;
     }
 
-    // Adds files (paths) and shows the shelf. Dirs get their kind fixed up by a stat.
+    // Adds files (paths) and shows the shelf. The items come back through the watcher.
     function add(paths) {
-        const fresh = paths.filter(p => p && !items.some(i => i.path === p.replace(/\/+$/, "")));
-        if (fresh.length) {
-            items = items.concat(fresh.map(p => item(p, false)));
-            detectFolders(fresh);
-            save();
-        }
+        paths = paths.filter(p => p);
+        if (paths.length)
+            call(["add"].concat(paths));
         if (!shown)
             showOnFocused();
     }
 
     function remove(path) {
-        items = items.filter(i => i.path !== path);
-        selected = selected.filter(p => p !== path);
-        save();
+        call(["remove", path]);
     }
 
     function clear() {
-        items = [];
-        selected = [];
         open = "";
         say("");
-        save();
+        call(["clear"]);
+    }
+
+    // A quick daemon call whose only output that matters is a failure.
+    function call(args) {
+        if (!installed) {
+            say("The shelf needs a rebuild first", true);
+            return;
+        }
+        caller.createObject(root, {
+            command: [bin].concat(args)
+        });
+    }
+
+    // From the daemon: the new item list, and why it changed.
+    function setItems(list, reason) {
+        items = list;
+        selected = selected.filter(p => list.some(i => i.path === p));
+        // Added from outside the bar (`shelf add`): show it, like a drop would.
+        if (reason === "add" && !shown)
+            showOnFocused();
     }
 
     function toggleSelected(path) {
@@ -137,44 +129,6 @@ Singleton {
 
     // ---- Tools
 
-    // Shown when the daemon isn't installed: what works without it.
-    function fallbackActions(n) {
-        const out = [];
-        if (n >= 2)
-            out.push({
-                id: "archive",
-                label: "Archive",
-                icon: "archive"
-            });
-        return out.concat([
-            {
-                id: "funnel",
-                label: "Funnel link",
-                icon: "link"
-            },
-            {
-                id: "wormhole",
-                label: "Wormhole",
-                icon: "wormhole"
-            },
-            {
-                id: "localsend",
-                label: "LocalSend",
-                icon: "send"
-            },
-            {
-                id: "taildrop",
-                label: "Taildrop",
-                icon: "tailscale"
-            },
-            {
-                id: "copy-paths",
-                label: n === 1 ? "Copy path" : "Copy paths",
-                icon: "copy"
-            }
-        ]);
-    }
-
     function refreshActions() {
         const paths = targets.map(i => i.kind === "folder" ? i.path + "/" : i.path);
         if (paths.length === 0) {
@@ -182,7 +136,7 @@ Singleton {
             return;
         }
         if (!installed) {
-            actions = fallbackActions(paths.length);
+            actions = [];
             return;
         }
         actionsQuery.running = false;
@@ -220,7 +174,7 @@ Singleton {
     function run(id, opt) {
         open = "";
         if (!installed) {
-            say("Shelf tools need a rebuild first", true);
+            say("The shelf needs a rebuild first", true);
             return;
         }
         const paths = targets.map(i => i.path);
@@ -230,7 +184,8 @@ Singleton {
                 wormhole: "Getting a wormhole code…",
                 shrink: "Re-encoding, this can take a while…",
                 gif: "Making a GIF…",
-                ocr: "Reading text…"
+                ocr: "Reading text…",
+                hand: "Handing to the shelf…"
             })[id] ?? "Working…");
         runner.createObject(root, {
             action: id,
@@ -253,14 +208,11 @@ Singleton {
             copy(r.copy);
         if (r.job)
             setJob(r.job);
-        if (r.outputs?.length) {
-            // Results go on top, marked new and selected, so the next tool works on them.
-            const kept = items.filter(i => !r.outputs.includes(i.path));
-            items = r.outputs.map(p => item(p, true)).concat(kept);
-            detectFolders(r.outputs);
-            selected = r.outputs.slice();
-            save();
-        }
+        // The daemon has put the results on the shelf (or moved the files onto it); select
+        // them, so the next tool works on them.
+        const pick = r.outputs?.length ? r.outputs : r.select ?? [];
+        if (pick.length)
+            selected = pick.slice();
     }
 
     function setJob(job) {
@@ -319,7 +271,7 @@ Singleton {
                     if (Array.isArray(list))
                         root.actions = list;
                 } catch (e) {
-                    root.actions = root.fallbackActions(root.targets.length);
+                    root.actions = [];
                 }
             }
         }
@@ -358,7 +310,8 @@ Singleton {
         }
     }
 
-    // Share updates from the daemon, one JSON object per line.
+    // The items (first all of them, then on every change) and share updates from the
+    // daemon, one JSON object per line.
     Process {
         id: watcher
         command: [root.bin, "watch"]
@@ -368,6 +321,10 @@ Singleton {
                 try {
                     e = JSON.parse(line);
                 } catch (err) {
+                    return;
+                }
+                if (Array.isArray(e.items)) {
+                    root.setItems(e.items, e.reason);
                     return;
                 }
                 if (root.wormhole?.id === e.job) {
@@ -424,38 +381,31 @@ Singleton {
         }
     }
 
-    // Marks dropped/added directories as folders (their paths carry no trailing slash).
-    function detectFolders(paths) {
-        folderProbe.createObject(root, {
-            command: ["sh", "-c", 'for p; do [ -d "$p" ] && printf "%s\\n" "$p"; done; true', "sh"].concat(paths)
-        });
-    }
-
     Component {
-        id: folderProbe
+        id: caller
 
         Process {
-            id: probe
+            id: callProc
 
             running: true
             stdout: StdioCollector {
                 onStreamFinished: {
-                    const dirs = text.split("\n").filter(l => l).map(p => p.replace(/\/+$/, ""));
-                    if (dirs.length)
-                        root.items = root.items.map(i => dirs.includes(i.path) ? Object.assign({}, i, {
-                                kind: "folder"
-                            }) : i);
-                    probe.destroy();
+                    try {
+                        const r = JSON.parse(text);
+                        if (!r.ok)
+                            root.say(r.message ?? "The shelf daemon failed", true);
+                    } catch (e) {}
+                    callProc.destroy();
                 }
             }
         }
     }
 
-    // ---- Persistence: the items survive reloads and restarts; the shelf itself starts hidden.
+    // ---- Persistence: which monitor the shelf was on (the items live in the daemon); the
+    // shelf itself starts hidden.
 
     function save() {
         store.setText(JSON.stringify({
-            items: items,
             screenName: screenName
         }));
     }
@@ -468,27 +418,16 @@ Singleton {
         printErrors: false
         onLoaded: {
             try {
-                const state = JSON.parse(text());
-                const saved = state?.items ?? [];
-                root.screenName = state?.screenName ?? "";
-                root.items = saved.filter(i => i?.path).map(i => Object.assign(root.item(i.path, i.fresh), {
-                        kind: i.kind ?? root.kindOf(i.path)
-                    }));
-            } catch (e) {
-                root.items = [];
-            }
+                root.screenName = JSON.parse(text())?.screenName ?? "";
+            } catch (e) {}
             root.restored = true;
         }
         onLoadFailed: root.restored = true
     }
 
-    // `qs ipc call shelf add /path/to/file`, `qs ipc call shelf toggle`.
+    // `qs ipc call shelf toggle`. Adding files is `shelf add`.
     IpcHandler {
         target: "shelf"
-
-        function add(path: string): void {
-            root.add([path]);
-        }
 
         function toggle(): void {
             root.toggle();

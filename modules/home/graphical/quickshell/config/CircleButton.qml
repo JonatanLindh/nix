@@ -9,6 +9,8 @@ MouseArea {
     property int size: 28
     property int iconSize: 15
     property color iconColor: Theme.textDim
+    // Theme.warnText for buttons that delete something.
+    property color hoverIconColor: Theme.text
     property color restColor: "transparent"
 
     implicitWidth: size
@@ -26,6 +28,6 @@ MouseArea {
         name: root.icon
         size: root.iconSize
         strokeWidth: 2.1
-        color: root.containsMouse ? Theme.text : root.iconColor
+        color: root.containsMouse ? root.hoverIconColor : root.iconColor
     }
 }

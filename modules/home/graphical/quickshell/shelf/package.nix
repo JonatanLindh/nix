@@ -11,6 +11,7 @@
   libarchive,
   magic-wormhole,
   tailscale,
+  coreutils,
 }:
 
 # `shelf`: the drag shelf's daemon and CLI. The tools it drives come along on its PATH;
@@ -48,6 +49,8 @@ rustPlatform.buildRustPackage {
           ffmpeg-headless
           libarchive
           magic-wormhole
+          # cp, for moving folders onto the shelf from another disk.
+          coreutils
         ]
       } \
       --suffix PATH : ${lib.makeBinPath [ tailscale ]}

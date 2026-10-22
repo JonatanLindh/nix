@@ -189,12 +189,13 @@ PanelWindow {
         IconButton {
             // qmllint disable unresolved-type
             readonly property BluetoothAdapter adapter: Bluetooth.defaultAdapter
+            readonly property bool connected: adapter?.devices.values.some(d => d.connected) ?? false
 
             visible: adapter !== null
             anchors.verticalCenter: parent.verticalCenter
             icon: "bluetooth"
             iconSize: 17
-            iconColor: adapter?.enabled ? Theme.text : Qt.alpha(Theme.text, 0.42)
+            iconColor: !adapter?.enabled ? Qt.alpha(Theme.text, 0.42) : connected ? Theme.bluetooth : Theme.text
             // qmllint enable unresolved-type
             active: bar.panel === "bt"
             onClicked: bar.toggle("bt")

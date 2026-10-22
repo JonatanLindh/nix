@@ -119,6 +119,9 @@
 
   programs.fish.enable = true;
   programs.nix-ld.enable = true;
+  # Third-party scripts (e.g. Claude Code plugins' hooks) use `#!/bin/bash`; NixOS only
+  # ships /bin/sh. Same bash as /bin/sh.
+  systemd.tmpfiles.rules = [ "L+ /bin/bash - - - - ${pkgs.bashInteractive}/bin/bash" ];
   programs.dconf.enable = true;
   programs.localsend.enable = true;
 

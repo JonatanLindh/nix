@@ -5,10 +5,10 @@ use std::{ffi::OsString, path::PathBuf};
 use anyhow::Context;
 
 use super::{Outcome, exec, size_of};
-use crate::files::{human_size, name, out_dir, plural, stem, unique};
+use crate::files::{human_size, name, plural, results_dir, stem, unique};
 
 pub async fn merge(files: &[PathBuf]) -> anyhow::Result<Outcome> {
-    let out = unique(&out_dir()?, "merged.pdf");
+    let out = unique(&results_dir()?, "merged.pdf");
     let mut args: Vec<OsString> = vec!["--empty".into(), "--pages".into()];
     args.extend(files.iter().map(OsString::from));
     args.extend(["--".into(), out.clone().into()]);
@@ -18,7 +18,7 @@ pub async fn merge(files: &[PathBuf]) -> anyhow::Result<Outcome> {
 }
 
 pub async fn compress(files: &[PathBuf]) -> anyhow::Result<Outcome> {
-    let dir = out_dir()?;
+    let dir = results_dir()?;
     let (mut before, mut after) = (0, 0);
     let mut made = Vec::new();
     for file in files {
@@ -54,7 +54,7 @@ pub async fn compress(files: &[PathBuf]) -> anyhow::Result<Outcome> {
 }
 
 pub async fn split(files: &[PathBuf]) -> anyhow::Result<Outcome> {
-    let dir = out_dir()?;
+    let dir = results_dir()?;
     let mut made = Vec::new();
     for file in files {
         let folder = unique(&dir, &format!("{}-pages", stem(file)));
