@@ -125,14 +125,19 @@ pub fn unique(dir: &Path, name: &str) -> PathBuf {
     if !first.exists() {
         return first;
     }
+    (2..)
+        .map(|i| dir.join(numbered(name, i)))
+        .find(|p| !p.exists())
+        .unwrap_or(first)
+}
+
+/// `stem (i).ext`, the name `unique` falls back to.
+pub fn numbered(name: &str, i: usize) -> String {
     let (base, ext) = match name.rfind('.') {
         Some(i) if i > 0 => (&name[..i], &name[i..]),
         _ => (name, ""),
     };
-    (2..)
-        .map(|i| dir.join(format!("{base} ({i}){ext}")))
-        .find(|p| !p.exists())
-        .unwrap_or(first)
+    format!("{base} ({i}){ext}")
 }
 
 /// A short random lowercase token for share paths.

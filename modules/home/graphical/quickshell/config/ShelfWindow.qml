@@ -694,10 +694,25 @@ PanelWindow {
                     color: "white"
                 }
             }
+            // Capped at its own width so the place sits right after it; shrinks (eliding)
+            // before the place does.
             UiText {
                 Layout.fillWidth: true
+                Layout.maximumWidth: implicitWidth
                 text: row.modelData.name
                 font.pixelSize: 13
+            }
+            // Its folder, when another item has the same name.
+            UiText {
+                readonly property string place: Shelf.places[row.modelData.path] ?? ""
+                visible: place !== ""
+                Layout.maximumWidth: 120
+                text: place
+                dim: true
+                font.pixelSize: Theme.small
+            }
+            Item {
+                Layout.fillWidth: true
             }
             // A result: the shelf's own file, deleted when it leaves the shelf (drag it out to
             // keep it).

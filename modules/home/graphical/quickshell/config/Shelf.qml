@@ -19,6 +19,32 @@ Singleton {
     // daemon deletes when they leave the shelf.
     property var items: []
     readonly property int count: items.length
+    // Where items that share a name live, by path: just enough of their folder to tell
+    // them apart ("Downloads", "a/src", "~"). Results are told apart by "Temp" already.
+    readonly property var places: {
+        const home = Quickshell.env("HOME");
+        const groups = {};
+        for (const i of items)
+            if (!i.temp)
+                groups[i.name] = (groups[i.name] ?? []).concat([i.path]);
+        const out = {};
+        for (const paths of Object.values(groups)) {
+            if (paths.length < 2)
+                continue;
+            const dirs = paths.map(p => p.split("/").slice(0, -1).filter(s => s !== ""));
+            const tail = (d, k) => d.slice(-k).join("/");
+            paths.forEach((p, n) => {
+                const d = dirs[n];
+                // The fewest trailing folders no other item's path ends in the same way.
+                let k = 1;
+                while (k < d.length && dirs.some((o, m) => m !== n && tail(o, k) === tail(d, k)))
+                    k++;
+                const dir = "/" + d.join("/");
+                out[p] = dir === home ? "~" : k >= d.length ? dir : tail(d, k);
+            });
+        }
+        return out;
+    }
     property bool shown: false
     // The monitor the shelf shows on ("" = the focused one at the time).
     property string screenName: ""
