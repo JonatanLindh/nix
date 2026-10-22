@@ -65,6 +65,13 @@ ShellRoot {
         onPressed: ColorPicker.pick()
     }
 
+    // The shelf, on the focused monitor.
+    GlobalShortcut {
+        appid: "quickshell"
+        name: "shelf"
+        onPressed: Shelf.toggle()
+    }
+
     // Print opens the capture overlay; while recording, it stops the recording instead.
     GlobalShortcut {
         appid: "quickshell"
