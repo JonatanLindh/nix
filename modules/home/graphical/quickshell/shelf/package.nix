@@ -12,6 +12,7 @@
   magic-wormhole,
   tailscale,
   coreutils,
+  wl-clipboard,
 }:
 
 # `shelf`: the drag shelf's daemon and CLI. The tools it drives come along on its PATH;
@@ -51,6 +52,8 @@ rustPlatform.buildRustPackage {
           magic-wormhole
           # cp, for moving folders onto the shelf from another disk.
           coreutils
+          # wl-paste, for `shelf paste`.
+          wl-clipboard
         ]
       } \
       --suffix PATH : ${lib.makeBinPath [ tailscale ]}

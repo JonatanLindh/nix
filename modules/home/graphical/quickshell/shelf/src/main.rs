@@ -3,6 +3,7 @@
 //! CLI (for Quickshell, scripts and keybinds) that print JSON on stdout.
 
 mod actions;
+mod clip;
 mod daemon;
 mod files;
 mod hand;
@@ -39,6 +40,12 @@ enum Command {
     Remove {
         #[arg(required = true)]
         files: Vec<String>,
+    },
+    /// Put the clipboard on the shelf: copied files as they are; a web address, text or
+    /// an image as a new temp file. With --text, that text instead.
+    Paste {
+        #[arg(long)]
+        text: Option<String>,
     },
     /// Empty the shelf.
     Clear,
@@ -103,6 +110,7 @@ async fn run(command: Command) -> anyhow::Result<()> {
             println!("{}", json!({ "ok": true }));
             Ok(())
         }
+        Command::Paste { text } => paste(text).await,
         Command::Clear => {
             daemon::proxy().await?.clear().await?;
             println!("{}", json!({ "ok": true }));
@@ -152,6 +160,37 @@ async fn run(command: Command) -> anyhow::Result<()> {
             }
         }
     }
+}
+
+/// Reads the clipboard here, where the Wayland session is; the daemon saves it.
+async fn paste(text: Option<String>) -> anyhow::Result<()> {
+    let proxy = daemon::proxy().await?;
+    let (mime, data) = match text {
+        Some(text) => ("text/plain".to_string(), text.into_bytes()),
+        None => {
+            let listed = tools::output("wl-paste", ["--list-types"])
+                .await
+                .map_err(|_| anyhow::anyhow!("The clipboard is empty"))?;
+            let types: Vec<&str> = listed.lines().map(str::trim).collect();
+            if types.contains(&"text/uri-list") {
+                let list = tools::output("wl-paste", ["--no-newline", "--type", "text/uri-list"])
+                    .await?;
+                if let Some(paths) = clip::file_paths(&list) {
+                    let n = paths.len();
+                    proxy.add(paths).await?;
+                    let message = format!("Added {}", files::plural(n, "file"));
+                    println!("{}", json!({ "ok": true, "message": message }));
+                    return Ok(());
+                }
+            }
+            let mime = clip::pick_type(&types)
+                .ok_or_else(|| anyhow::anyhow!("Nothing on the clipboard the shelf can hold"))?;
+            let out = tools::exec("wl-paste", ["--no-newline", "--type", &mime]).await?;
+            (mime, out.stdout)
+        }
+    };
+    println!("{}", proxy.paste(&mime, data).await?);
+    Ok(())
 }
 
 /// The daemon has its own working directory, so paths go to it absolute.

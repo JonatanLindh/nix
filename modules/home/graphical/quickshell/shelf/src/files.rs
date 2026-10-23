@@ -17,6 +17,8 @@ pub enum Kind {
     Folder,
     /// An internet shortcut (`.url`), what phones send when sharing a link.
     Link,
+    /// Plain text (`.txt`), e.g. a pasted note.
+    Text,
     Other,
 }
 
@@ -42,6 +44,7 @@ pub fn kind_of(file: &str) -> Kind {
         Some("pdf") => Kind::Pdf,
         Some("mp4" | "mkv" | "webm" | "mov" | "avi" | "m4v") => Kind::Video,
         Some("url") => Kind::Link,
+        Some("txt") => Kind::Text,
         _ => Kind::Other,
     }
 }
@@ -223,7 +226,8 @@ mod tests {
         assert_eq!(kind_of("/x/a.tar.gz"), Kind::Archive);
         assert_eq!(kind_of("/x/a.pdf"), Kind::Pdf);
         assert_eq!(kind_of("/x/a.mkv"), Kind::Video);
-        assert_eq!(kind_of("/x/a.txt"), Kind::Other);
+        assert_eq!(kind_of("/x/a.txt"), Kind::Text);
+        assert_eq!(kind_of("/x/a.md"), Kind::Other);
         assert_eq!(kind_of("/x/dir/"), Kind::Folder);
         assert_eq!(kind_of("/x/43d7.url"), Kind::Link);
     }

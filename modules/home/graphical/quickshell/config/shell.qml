@@ -72,6 +72,13 @@ ShellRoot {
         onPressed: Shelf.toggle()
     }
 
+    // The clipboard onto the shelf: files as they are, links, text and images as new items.
+    GlobalShortcut {
+        appid: "quickshell"
+        name: "shelf-paste"
+        onPressed: Shelf.paste()
+    }
+
     // Print opens the capture overlay; while recording, it stops the recording instead.
     GlobalShortcut {
         appid: "quickshell"

@@ -24,7 +24,8 @@ use crate::{
 pub struct Item {
     pub path: String,
     pub name: String,
-    /// The UI's icon: "folder", "video", "image", "archive", "code", "link" or "file".
+    /// The UI's icon: "folder", "video", "image", "archive", "code", "link", "text" or
+    /// "file".
     pub kind: String,
     /// One of the shelf's own results, deleted when it leaves the shelf ("Temp" in the UI).
     /// Worked out from where it lives, never taken from the saved file.
@@ -71,6 +72,7 @@ fn ui_kind(path: &str) -> &'static str {
         Kind::Archive => "archive",
         // Only a "link" with a URL in it (`Item::new`).
         Kind::Pdf | Kind::Link => "file",
+        Kind::Text => "text",
         Kind::Other => {
             let ext = Path::new(path)
                 .extension()

@@ -26,7 +26,8 @@ use crate::{
 
 #[derive(Serialize, Debug)]
 pub struct LinkQr {
-    pub url: String,
+    /// What's encoded: a link's address or a note's text.
+    pub text: String,
     #[serde(flatten)]
     pub qr: Qr,
 }
@@ -116,13 +117,42 @@ pub async fn run(action: &str, opt: &str, files: &[PathBuf]) -> anyhow::Result<O
             })
         }
         "qr" => {
-            let [url] = links(files)?.try_into().map_err(|_| anyhow::anyhow!("Pick one link"))?;
+            let [file] = files else {
+                bail!("Pick one link or note");
+            };
+            let (text, message) = match kind_of(&file.to_string_lossy()) {
+                Kind::Text => {
+                    if size_of(file) > crate::actions::QR_TEXT_MAX {
+                        bail!("Too much text for a QR code");
+                    }
+                    let text = std::fs::read_to_string(file).context("Not plain text")?;
+                    (text.trim_end().to_string(), "Scan to read it on your phone")
+                }
+                _ => (
+                    links(files)?.remove(0),
+                    "Scan to open on your phone",
+                ),
+            };
             Ok(Outcome {
                 qr: Some(LinkQr {
-                    qr: qr::encode(&url)?,
-                    url,
+                    qr: qr::encode(&text)?,
+                    text,
                 }),
-                ..Outcome::said("Scan to open on your phone")
+                ..Outcome::said(message)
+            })
+        }
+        "copy-text" => {
+            let texts = files
+                .iter()
+                .map(|f| {
+                    std::fs::read_to_string(f)
+                        .map(|t| t.trim_end().to_string())
+                        .with_context(|| format!("{} isn't plain text", crate::files::name(f)))
+                })
+                .collect::<anyhow::Result<Vec<_>>>()?;
+            Ok(Outcome {
+                copy: Some(texts.join("\n\n")),
+                ..Outcome::said("Copied text")
             })
         }
         "copy-paths" => Ok(Outcome {

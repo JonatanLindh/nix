@@ -10,7 +10,7 @@ use tokio::signal::unix::{SignalKind, signal};
 use zbus::{interface, object_server::SignalEmitter};
 
 use crate::{
-    actions, hand,
+    actions, clip, hand,
     jobs::Jobs,
     taildrop,
     store::Store,
@@ -81,7 +81,21 @@ impl Shelf {
             .unwrap_or_else(|e| json!({ "ok": false, "message": e.to_string() }).to_string())
     }
 
-    /// The shelf's items, as a JSON array of `{path, name, kind, temp}`.
+    /// Saves clipboard `data` of type `mime` as a new item on top; a JSON outcome like
+    /// `Run`'s.
+    async fn paste(
+        &self,
+        mime: &str,
+        data: Vec<u8>,
+        #[zbus(signal_emitter)] emitter: SignalEmitter<'_>,
+    ) -> String {
+        let outcome = clip::save(mime, &data).unwrap_or_else(|e| Outcome::failed(format!("{e:#}")));
+        let added = self.store.add_results(&outcome.outputs);
+        self.changed(&emitter, added, "result").await;
+        json!(outcome).to_string()
+    }
+
+    /// The shelf's items, as a JSON array of `{path, name, kind, temp, url?}`.
     async fn items(&self) -> String {
         json!(self.store.items()).to_string()
     }

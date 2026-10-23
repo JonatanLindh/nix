@@ -4,6 +4,9 @@ use serde::Serialize;
 
 use crate::files::{Kind, in_dir, kind_of, results_path};
 
+/// Text up to this size gets a QR code; much more and it's too dense to scan.
+pub const QR_TEXT_MAX: u64 = 1000;
+
 #[derive(Serialize, Debug)]
 pub struct Action {
     pub id: &'static str,
@@ -79,6 +82,12 @@ pub fn for_files(files: &[String]) -> Vec<Action> {
             "copy",
         ));
         if n == 1 {
+            out.push(action("qr", "QR code", "qr"));
+        }
+    }
+    if all(Kind::Text) {
+        out.push(action("copy-text", "Copy text", "copy"));
+        if n == 1 && std::fs::metadata(&files[0]).is_ok_and(|m| m.len() <= QR_TEXT_MAX) {
             out.push(action("qr", "QR code", "qr"));
         }
     }

@@ -212,6 +212,7 @@ hl.bind("SUPER + N", hl.dsp.global("quickshell:notif"))          -- notification
 hl.bind("SUPER + SHIFT + P", hl.dsp.global("quickshell:op"))     -- 1password (quickshell)
 hl.bind("SUPER + SHIFT + C", hl.dsp.global("quickshell:picker")) -- colour picker (quickshell)
 hl.bind("SUPER + D", hl.dsp.global("quickshell:shelf"))          -- drag shelf (quickshell)
+hl.bind("SUPER + SHIFT + D", hl.dsp.global("quickshell:shelf-paste")) -- clipboard onto the shelf
 
 hl.bind("SUPER + left", hl.dsp.focus({ direction = "left" }))
 hl.bind("SUPER + right", hl.dsp.focus({ direction = "right" }))

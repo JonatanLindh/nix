@@ -59,7 +59,8 @@ Singleton {
     // "more", "qr", or "".
     property string open: ""
     property var peers: []
-    // The link QR's { url, size, path }, from the daemon; shown while `open` is "qr".
+    // The QR's { text, size, path } (a link's address or a note), from the daemon; shown
+    // while `open` is "qr".
     property var linkQr: null
     property bool peersLoading: false
 
@@ -92,6 +93,23 @@ Singleton {
             call(["add"].concat(paths));
         if (!shown)
             showOnFocused();
+    }
+
+    // Puts the clipboard on the shelf (or `text`, e.g. a link dropped from a browser) and
+    // shows it. The new item comes back on top, selected.
+    function paste(text) {
+        if (!shown)
+            showOnFocused();
+        if (!installed) {
+            say("The shelf needs a rebuild first", true);
+            return;
+        }
+        busy = busy.concat(["paste"]);
+        say("Pasting…");
+        runner.createObject(root, {
+            action: "paste",
+            command: [bin, "paste"].concat(text === undefined ? [] : ["--text", text])
+        });
     }
 
     function remove(path) {
@@ -469,6 +487,10 @@ Singleton {
 
         function toggle(): void {
             root.toggle();
+        }
+
+        function paste(): void {
+            root.paste();
         }
     }
 }

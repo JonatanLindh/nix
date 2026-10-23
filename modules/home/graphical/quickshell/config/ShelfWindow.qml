@@ -66,7 +66,8 @@ PanelWindow {
             code: "#2f8f7f",
             archive: "#7a6a4a",
             video: "#b0753f",
-            link: "#3f8f5a"
+            link: "#3f8f5a",
+            text: "#6a7a8a"
         })
 
     Glass {
@@ -87,11 +88,15 @@ PanelWindow {
             onExited: root.dropHover = false
             onDropped: drop => {
                 root.dropHover = false;
-                const paths = drop.urls.map(u => root.pathOf(u)).filter(p => p.startsWith("/"));
+                const urls = drop.urls.map(u => u.toString());
+                const paths = urls.filter(u => u.startsWith("file://")).map(u => root.pathOf(u)).filter(p => p.startsWith("/"));
                 if (paths.length) {
                     Shelf.add(paths);
                     Shelf.say(paths.length === 1 ? "Added 1 file" : `Added ${paths.length} files`);
                 }
+                // A link dragged from a browser becomes a link item.
+                for (const u of urls.filter(u => /^https?:\/\//i.test(u)))
+                    Shelf.paste(u);
                 drop.accept(Qt.CopyAction);
             }
         }
@@ -517,9 +522,10 @@ PanelWindow {
                     UiText {
                         Layout.fillWidth: true
                         horizontalAlignment: Text.AlignHCenter
-                        text: Shelf.linkQr?.url ?? ""
+                        text: Shelf.linkQr?.text ?? ""
                         mono: true
                         elide: Text.ElideMiddle
+                        maximumLineCount: 1
                         color: Qt.rgba(235 / 255, 243 / 255, 242 / 255, 0.8)
                         font.pixelSize: Theme.tiny
                     }
