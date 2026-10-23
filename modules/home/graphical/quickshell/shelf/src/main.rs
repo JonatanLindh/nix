@@ -11,6 +11,7 @@ mod jobs;
 mod peers;
 mod qr;
 mod store;
+mod taildrop;
 mod tools;
 mod watch;
 

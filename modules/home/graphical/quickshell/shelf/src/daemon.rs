@@ -12,6 +12,7 @@ use zbus::{interface, object_server::SignalEmitter};
 use crate::{
     actions, hand,
     jobs::Jobs,
+    taildrop,
     store::Store,
     tools::{self, Outcome},
 };
@@ -124,7 +125,8 @@ impl Shelf {
     ) -> zbus::Result<()>;
 
     /// The items changed (all of them, as in `Items`); reason is "add", "remove", "clear",
-    /// "result", "hand" (handed to the shelf) or "gone" (files that went away).
+    /// "result", "hand" (handed to the shelf), "taildrop" (received) or "gone" (files that
+    /// went away).
     #[zbus(signal)]
     pub async fn items_changed(
         emitter: &SignalEmitter<'_>,
@@ -146,6 +148,11 @@ pub async fn serve() -> anyhow::Result<()> {
             },
         )
         .await?;
+    // Files sent to this device by Taildrop go on the shelf.
+    tokio::spawn(taildrop::receive(
+        store.clone(),
+        SignalEmitter::new(&conn, OBJECT_PATH)?.into_owned(),
+    ));
     // Items whose file went away (dragged out by a file manager that moves) leave the shelf.
     if let Some(mut events) = events {
         let emitter = SignalEmitter::new(&conn, OBJECT_PATH)?.into_owned();

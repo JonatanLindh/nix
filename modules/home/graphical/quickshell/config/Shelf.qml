@@ -117,8 +117,9 @@ Singleton {
     function setItems(list, reason) {
         items = list;
         selected = selected.filter(p => list.some(i => i.path === p));
-        // Added from outside the bar (`shelf add`): show it, like a drop would.
-        if (reason === "add" && !shown)
+        // Added from outside the bar (`shelf add`, a Taildrop arriving): show it, like a
+        // drop would.
+        if ((reason === "add" || reason === "taildrop") && !shown)
             showOnFocused();
     }
 
