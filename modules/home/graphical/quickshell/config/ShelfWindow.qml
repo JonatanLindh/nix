@@ -65,7 +65,8 @@ PanelWindow {
             image: "#8c5cb0",
             code: "#2f8f7f",
             archive: "#7a6a4a",
-            video: "#b0753f"
+            video: "#b0753f",
+            link: "#3f8f5a"
         })
 
     Glass {
@@ -491,6 +492,40 @@ PanelWindow {
                 }
             }
 
+            // A link's address as a QR, to open it on a phone.
+            Rectangle {
+                visible: Shelf.open === "qr" && !!Shelf.linkQr
+                Layout.fillWidth: true
+                Layout.topMargin: 6
+                implicitHeight: linkColumn.implicitHeight + 24
+                radius: 14
+                color: Qt.rgba(1, 1, 1, 0.07)
+
+                ColumnLayout {
+                    id: linkColumn
+
+                    anchors.fill: parent
+                    anchors.margins: 12
+                    spacing: 10
+
+                    QrCode {
+                        Layout.alignment: Qt.AlignHCenter
+                        qr: Shelf.linkQr
+                        box: 136
+                        pad: 8
+                    }
+                    UiText {
+                        Layout.fillWidth: true
+                        horizontalAlignment: Text.AlignHCenter
+                        text: Shelf.linkQr?.url ?? ""
+                        mono: true
+                        elide: Text.ElideMiddle
+                        color: Qt.rgba(235 / 255, 243 / 255, 242 / 255, 0.8)
+                        font.pixelSize: Theme.tiny
+                    }
+                }
+            }
+
             // Funnel: the public link and its QR until stopped.
             Rectangle {
                 visible: !!Shelf.funnel && Shelf.funnelCard
@@ -626,8 +661,10 @@ PanelWindow {
     // ---- Pieces
 
     // Carries file URIs out of the shelf (a proxy, so the row itself stays put).
+    // A link carries its address instead, so it drops into a browser or chat as the link.
     component DragProxy: Item {
         property var paths: []
+        property string url: ""
         property bool active: false
 
         width: 1
@@ -637,10 +674,13 @@ PanelWindow {
         Drag.proposedAction: Qt.CopyAction
         Drag.hotSpot.x: 13
         Drag.hotSpot.y: 13
-        Drag.mimeData: ({
-                "text/uri-list": Shelf.uriList(paths),
-                "text/plain": paths.join("\n")
-            })
+        Drag.mimeData: url !== "" ? {
+            "text/uri-list": url + "\r\n",
+            "text/plain": url
+        } : {
+            "text/uri-list": Shelf.uriList(paths),
+            "text/plain": paths.join("\n")
+        }
         Drag.active: active
     }
 
@@ -662,6 +702,7 @@ PanelWindow {
         DragProxy {
             id: proxy
             paths: [row.modelData.path]
+            url: row.modelData.url ?? ""
             active: row.drag.active
         }
 

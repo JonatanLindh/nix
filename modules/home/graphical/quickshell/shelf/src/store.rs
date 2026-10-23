@@ -14,7 +14,9 @@ use std::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    files::{Kind, in_dir, kind_of, remove_path, results_dir, state_dir},
+    files::{
+        Kind, in_dir, kind_of, link_name, link_url, remove_path, results_dir, state_dir,
+    },
     watch::{Events, Watcher},
 };
 
@@ -22,25 +24,35 @@ use crate::{
 pub struct Item {
     pub path: String,
     pub name: String,
-    /// The UI's icon: "folder", "video", "image", "archive", "code" or "file".
+    /// The UI's icon: "folder", "video", "image", "archive", "code", "link" or "file".
     pub kind: String,
     /// One of the shelf's own results, deleted when it leaves the shelf ("Temp" in the UI).
     /// Worked out from where it lives, never taken from the saved file.
     #[serde(default)]
     pub temp: bool,
+    /// For a link (`.url` shortcut): its address, which the UI drags out and copies.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
 }
 
 impl Item {
     fn new(path: &str, temp: bool) -> Self {
         let clean = clean(path);
+        let url = (kind_of(&clean) == Kind::Link)
+            .then(|| link_url(Path::new(&clean)))
+            .flatten();
         Self {
-            name: Path::new(&clean)
-                .file_name()
-                .map(|n| n.to_string_lossy().into_owned())
-                .unwrap_or_else(|| clean.clone()),
-            kind: ui_kind(path).into(),
+            name: match &url {
+                Some(url) => link_name(url),
+                None => Path::new(&clean)
+                    .file_name()
+                    .map(|n| n.to_string_lossy().into_owned())
+                    .unwrap_or_else(|| clean.clone()),
+            },
+            kind: if url.is_some() { "link" } else { ui_kind(path) }.into(),
             path: clean,
             temp,
+            url,
         }
     }
 }
@@ -57,7 +69,8 @@ fn ui_kind(path: &str) -> &'static str {
         Kind::Video => "video",
         Kind::Image => "image",
         Kind::Archive => "archive",
-        Kind::Pdf => "file",
+        // Only a "link" with a URL in it (`Item::new`).
+        Kind::Pdf | Kind::Link => "file",
         Kind::Other => {
             let ext = Path::new(path)
                 .extension()

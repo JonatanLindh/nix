@@ -56,9 +56,11 @@ Singleton {
     // Tools for the targets ([{ id, label, icon, options? }]), from `shelf actions`.
     property var actions: []
     // Which inline panel is open under the tools: an action id with options, "taildrop",
-    // "more", or "".
+    // "more", "qr", or "".
     property string open: ""
     property var peers: []
+    // The link QR's { url, size, path }, from the daemon; shown while `open` is "qr".
+    property var linkQr: null
     property bool peersLoading: false
 
     // Running shares (from the daemon): the funnel link and the wormhole send, or null.
@@ -173,6 +175,11 @@ Singleton {
 
     // A tool tile was clicked.
     function activate(action) {
+        // The QR is a card under the tools: the tile folds it away again.
+        if (action.id === "qr" && open === "qr") {
+            open = "";
+            return;
+        }
         if (action.id === "more" || action.options || action.id === "taildrop") {
             open = open === action.id ? "" : action.id;
             if (open === "taildrop")
@@ -233,6 +240,10 @@ Singleton {
         say(r.job ? "" : r.message ?? "", !r.ok);
         if (r.copy)
             copy(r.copy);
+        if (r.qr) {
+            linkQr = r.qr;
+            open = "qr";
+        }
         if (r.job)
             setJob(r.job);
         // The daemon has put the results on the shelf (or moved the files onto it); select

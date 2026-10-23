@@ -18,7 +18,18 @@ use tokio::process::Command;
 
 pub use archive::zip_to;
 
-use crate::{files::plural, jobs::JobInfo};
+use crate::{
+    files::{Kind, kind_of, link_url, plural},
+    jobs::JobInfo,
+    qr::{self, Qr},
+};
+
+#[derive(Serialize, Debug)]
+pub struct LinkQr {
+    pub url: String,
+    #[serde(flatten)]
+    pub qr: Qr,
+}
 
 /// What an action did, as printed for the UI.
 #[derive(Serialize, Debug, Default)]
@@ -33,6 +44,9 @@ pub struct Outcome {
     /// Text the UI should put on the clipboard.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub copy: Option<String>,
+    /// A QR code for the UI to show (a link's address).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub qr: Option<LinkQr>,
     /// A share that keeps running after this call.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub job: Option<JobInfo>,
@@ -90,6 +104,27 @@ pub async fn run(action: &str, opt: &str, files: &[PathBuf]) -> anyhow::Result<O
         "open" => open(files),
         "localsend" => localsend(files).await,
         "taildrop" => taildrop(files, opt).await,
+        "copy-url" => {
+            let urls = links(files)?;
+            Ok(Outcome {
+                copy: Some(urls.join("\n")),
+                ..Outcome::said(if urls.len() == 1 {
+                    "Copied URL".to_string()
+                } else {
+                    format!("Copied {}", plural(urls.len(), "URL"))
+                })
+            })
+        }
+        "qr" => {
+            let [url] = links(files)?.try_into().map_err(|_| anyhow::anyhow!("Pick one link"))?;
+            Ok(Outcome {
+                qr: Some(LinkQr {
+                    qr: qr::encode(&url)?,
+                    url,
+                }),
+                ..Outcome::said("Scan to open on your phone")
+            })
+        }
         "copy-paths" => Ok(Outcome {
             copy: Some(
                 files
@@ -104,8 +139,23 @@ pub async fn run(action: &str, opt: &str, files: &[PathBuf]) -> anyhow::Result<O
     }
 }
 
+/// The addresses in link files; an error if one isn't a link.
+fn links(files: &[PathBuf]) -> anyhow::Result<Vec<String>> {
+    files
+        .iter()
+        .map(|f| {
+            link_url(f).with_context(|| format!("{} has no web address", crate::files::name(f)))
+        })
+        .collect()
+}
+
 fn open(files: &[PathBuf]) -> anyhow::Result<Outcome> {
     for f in files {
+        // A link opens its address (in the browser), not the shortcut file.
+        let target = match kind_of(&f.to_string_lossy()) {
+            Kind::Link => link_url(f).map_or_else(|| f.as_os_str().to_owned(), Into::into),
+            _ => f.as_os_str().to_owned(),
+        };
         let mut cmd = if which("uwsm-app") {
             let mut c = Command::new("uwsm-app");
             c.args(["--", "xdg-open"]);
@@ -114,7 +164,7 @@ fn open(files: &[PathBuf]) -> anyhow::Result<Outcome> {
             Command::new("xdg-open")
         };
         let mut child = cmd
-            .arg(f)
+            .arg(target)
             .stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(Stdio::null())

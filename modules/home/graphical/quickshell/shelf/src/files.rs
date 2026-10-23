@@ -15,6 +15,8 @@ pub enum Kind {
     Video,
     Archive,
     Folder,
+    /// An internet shortcut (`.url`), what phones send when sharing a link.
+    Link,
     Other,
 }
 
@@ -39,8 +41,43 @@ pub fn kind_of(file: &str) -> Kind {
         ) => Kind::Image,
         Some("pdf") => Kind::Pdf,
         Some("mp4" | "mkv" | "webm" | "mov" | "avi" | "m4v") => Kind::Video,
+        Some("url") => Kind::Link,
         _ => Kind::Other,
     }
+}
+
+/// The web address in an internet shortcut (`[InternetShortcut]` with a `URL=` line).
+/// Only http(s): it gets opened, and a shortcut can name any scheme.
+pub fn link_url(file: &Path) -> Option<String> {
+    let mut text = String::new();
+    // A shortcut is a few lines; don't read a big file that merely ends in .url.
+    std::fs::File::open(file)
+        .ok()?
+        .take(16 * 1024)
+        .read_to_string(&mut text)
+        .ok()?;
+    parse_link(&text)
+}
+
+fn parse_link(text: &str) -> Option<String> {
+    let mut in_section = false;
+    for line in text.lines().map(str::trim) {
+        if line.starts_with('[') {
+            in_section = line.eq_ignore_ascii_case("[InternetShortcut]");
+        } else if in_section && let Some(url) = line.strip_prefix("URL=") {
+            let lower = url.to_ascii_lowercase();
+            return (lower.starts_with("https://") || lower.starts_with("http://"))
+                .then(|| url.to_string());
+        }
+    }
+    None
+}
+
+/// A URL as a short name: no scheme, `www.` or trailing slash.
+pub fn link_name(url: &str) -> String {
+    let rest = url.split_once("://").map_or(url, |(_, r)| r);
+    let rest = rest.strip_prefix("www.").unwrap_or(rest);
+    rest.trim_end_matches('/').to_string()
 }
 
 /// File name without its extension (and without a compound archive suffix).
@@ -188,6 +225,17 @@ mod tests {
         assert_eq!(kind_of("/x/a.mkv"), Kind::Video);
         assert_eq!(kind_of("/x/a.txt"), Kind::Other);
         assert_eq!(kind_of("/x/dir/"), Kind::Folder);
+        assert_eq!(kind_of("/x/43d7.url"), Kind::Link);
+    }
+
+    #[test]
+    fn links() {
+        let shortcut = "[InternetShortcut]\r\nURL=https://www.reddit.com/r/a/\r\n";
+        let url = parse_link(shortcut).unwrap();
+        assert_eq!(url, "https://www.reddit.com/r/a/");
+        assert_eq!(link_name(&url), "reddit.com/r/a");
+        assert_eq!(parse_link("[Other]\nURL=https://x.org"), None);
+        assert_eq!(parse_link("[InternetShortcut]\nURL=file:///etc/passwd"), None);
     }
 
     #[test]

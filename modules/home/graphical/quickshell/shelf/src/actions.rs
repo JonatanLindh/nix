@@ -72,6 +72,16 @@ pub fn for_files(files: &[String]) -> Vec<Action> {
     if n == 1 {
         out.push(action("open", "Open", "open"));
     }
+    if all(Kind::Link) {
+        out.push(action(
+            "copy-url",
+            if n == 1 { "Copy URL" } else { "Copy URLs" },
+            "copy",
+        ));
+        if n == 1 {
+            out.push(action("qr", "QR code", "qr"));
+        }
+    }
     if all(Kind::Image) {
         out.push(Action {
             options: choices("Convert to", CONVERT_FORMATS),
@@ -110,10 +120,17 @@ pub fn for_files(files: &[String]) -> Vec<Action> {
     }) {
         out.push(action("hand", "Hand to shelf", "inbox"));
     }
-    out.push(action("funnel", "Funnel link", "link"));
-    out.push(action("wormhole", "Wormhole", "wormhole"));
-    out.push(action("localsend", "LocalSend", "send"));
+    // A link's file is only its address: sharing it is Taildrop (or the QR), not a public
+    // link to a file.
+    if !all(Kind::Link) {
+        out.push(action("funnel", "Funnel link", "link"));
+        out.push(action("wormhole", "Wormhole", "wormhole"));
+        out.push(action("localsend", "LocalSend", "send"));
+    }
     out.push(action("taildrop", "Taildrop", "tailscale"));
+    if all(Kind::Link) {
+        return out;
+    }
     out.push(action(
         "copy-paths",
         if n == 1 { "Copy path" } else { "Copy paths" },
@@ -153,6 +170,15 @@ mod tests {
                 "taildrop",
                 "copy-paths"
             ]
+        );
+    }
+
+    #[test]
+    fn one_link() {
+        let own = results_path().unwrap().join("43d7.url");
+        assert_eq!(
+            ids(&[own.to_str().unwrap()]),
+            ["open", "copy-url", "qr", "taildrop"]
         );
     }
 
