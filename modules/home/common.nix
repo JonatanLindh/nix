@@ -108,6 +108,7 @@ in
 
     helix = {
       enable = true;
+      defaultEditor = true;
       settings = {
         theme = "monokai_pro_spectrum";
         editor.cursor-shape = {
@@ -155,6 +156,16 @@ in
       enable = true;
       enableFishIntegration = true;
       options = [ "--cmd cd" ];
+    };
+
+    herdr = {
+      enable = true;
+      settings = { };
+    };
+
+    aria2 = {
+      enable = true;
+      settings = { };
     };
 
     starship = {

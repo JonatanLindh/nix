@@ -62,7 +62,7 @@
       settings = {
         theme = "Monokai Pro Spectrum";
         font-family = "JetBrainsMono Nerd Font";
-        font-size = 15;
+        font-size = 13;
         background-opacity = 0.9;
       };
     };
