@@ -160,6 +160,8 @@
     };
 
     extraModulePackages = [ config.boot.kernelPackages.xone ];
+
+    tmp.useTmpfs = true;
   };
 
   hardware = {
