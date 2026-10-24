@@ -202,16 +202,18 @@ hl.bind("SUPER + J", hl.dsp.group.toggle())
 hl.bind("SUPER + F", hl.dsp.window.fullscreen(0))
 hl.bind("SUPER + L", function()
     local ws = hl.get_active_workspace()
-    local next_layout = ws.tiled_layout == "dwindle" and "scrolling" or "dwindle"
-    hl.workspace_rule({ workspace = ws.name, layout = next_layout })
-    Debug("Layout (" .. ws.name .. "): " .. next_layout)
+    if ws ~= nil then
+        local next_layout = ws.tiled_layout == "dwindle" and "scrolling" or "dwindle"
+        hl.workspace_rule({ workspace = ws.name, layout = next_layout })
+        Debug("Layout (" .. ws.name .. "): " .. next_layout)
+    end
 end)
-hl.bind("SUPER + M", hl.dsp.global("quickshell:session"))        -- session menu (quickshell)
-hl.bind("SUPER + V", hl.dsp.global("quickshell:clip"))           -- clipboard history (quickshell)
-hl.bind("SUPER + N", hl.dsp.global("quickshell:notif"))          -- notification history (quickshell)
-hl.bind("SUPER + SHIFT + P", hl.dsp.global("quickshell:op"))     -- 1password (quickshell)
-hl.bind("SUPER + SHIFT + C", hl.dsp.global("quickshell:picker")) -- colour picker (quickshell)
-hl.bind("SUPER + D", hl.dsp.global("quickshell:shelf"))          -- drag shelf (quickshell)
+hl.bind("SUPER + M", hl.dsp.global("quickshell:session"))             -- session menu (quickshell)
+hl.bind("SUPER + V", hl.dsp.global("quickshell:clip"))                -- clipboard history (quickshell)
+hl.bind("SUPER + N", hl.dsp.global("quickshell:notif"))               -- notification history (quickshell)
+hl.bind("SUPER + SHIFT + P", hl.dsp.global("quickshell:op"))          -- 1password (quickshell)
+hl.bind("SUPER + SHIFT + C", hl.dsp.global("quickshell:picker"))      -- colour picker (quickshell)
+hl.bind("SUPER + D", hl.dsp.global("quickshell:shelf"))               -- drag shelf (quickshell)
 hl.bind("SUPER + SHIFT + D", hl.dsp.global("quickshell:shelf-paste")) -- clipboard onto the shelf
 
 hl.bind("SUPER + left", hl.dsp.focus({ direction = "left" }))
