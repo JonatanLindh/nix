@@ -8,7 +8,7 @@
       CPU_SCALING_GOVERNOR_ON_SAV = "powersave";
 
       CPU_ENERGY_PERF_POLICY_ON_AC = "performance";
-      CPU_ENERGY_PERF_POLICY_ON_BAT = "balance_performance";
+      CPU_ENERGY_PERF_POLICY_ON_BAT = "balance_power";
       CPU_ENERGY_PERF_POLICY_ON_SAV = "power";
 
       PLATFORM_PROFILE_ON_AC = "performance";
@@ -38,9 +38,11 @@
       RUNTIME_PM_ON_AC = "on";
       RUNTIME_PM_ON_BAT = "auto";
       RUNTIME_PM_ON_SAV = "auto";
+      # Runtime PM "on" while on AC would keep the dGPU's root port awake and block D3cold
+      RUNTIME_PM_DENYLIST = "00:01.0";
 
       PCIE_ASPM_ON_AC = "default";
-      PCIE_ASPM_ON_BAT = "powersave";
+      PCIE_ASPM_ON_BAT = "powersupersave";
       PCIE_ASPM_ON_SAV = "powersupersave";
 
       # Disk and Controller refinements
@@ -64,6 +66,9 @@
       SOUND_POWER_SAVE_ON_AC = 1;
       SOUND_POWER_SAVE_ON_BAT = 1;
       SOUND_POWER_SAVE_ON_SAV = 1;
+
+      # Lets the BT controller and its xHCI suspend so the package can reach deep C-states
+      DEVICES_TO_DISABLE_ON_BAT_NOT_IN_USE = "bluetooth";
     };
   };
 }

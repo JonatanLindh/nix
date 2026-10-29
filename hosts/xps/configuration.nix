@@ -9,9 +9,9 @@
   imports = [
     ./hardware-configuration.nix
     ./nvidia.nix
+    ./tlp.nix
     flake.nixosModules.common
     flake.nixosModules.graphical
-    flake.nixosModules.tlp
   ];
 
   nix.distributedBuilds = false;
