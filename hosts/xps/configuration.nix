@@ -37,7 +37,8 @@
   ];
 
   boot = {
-    kernelPackages = pkgs.linuxPackages_latest;
+    # 7.3 + nvidia-open 615.78.08 breaks dGPU runtime D3 ("Not supported"); unpin once fixed
+    kernelPackages = pkgs.linuxPackages_7_2;
 
     # WiFi speed is slow and crashes by default (https://bugzilla.kernel.org/show_bug.cgi?id=213381)
     # Tuning based on iwlwifi reference(https://wiki.archlinux.org/title/Network_configuration/Wireless#iwlwifi)

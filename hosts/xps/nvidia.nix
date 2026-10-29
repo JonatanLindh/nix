@@ -6,6 +6,9 @@
 {
   services.xserver.videoDrivers = [ "nvidia" ];
 
+  # TLP pins runtime PM "on" while on AC; leave the dGPU's root port alone so it can reach D3cold
+  services.tlp.settings.RUNTIME_PM_DENYLIST = "00:01.0";
+
   hardware = {
     graphics.extraPackages = with pkgs; [
       nvidia-vaapi-driver
