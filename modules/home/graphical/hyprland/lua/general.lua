@@ -114,7 +114,7 @@ hl.animation({ leaf = "workspacesOut", enabled = true, speed = 1.94, bezier = "a
 hl.animation({ leaf = "zoomFactor", enabled = true, speed = 7, bezier = "quick" })
 
 -- Workspace monitor assignments
-hl.workspace_rule({ workspace = "1", monitor = mon_right, default = true, on_created_empty = LaunchOnce "zen-beta" })
+hl.workspace_rule({ workspace = "1", monitor = mon_right, default = true })
 hl.workspace_rule({ workspace = "2", monitor = mon_right })
 hl.workspace_rule({ workspace = "3", monitor = mon_right })
 hl.workspace_rule({ workspace = "4", monitor = mon_right })
@@ -122,8 +122,31 @@ hl.workspace_rule({ workspace = "5", monitor = mon_right })
 hl.workspace_rule({ workspace = "6", monitor = mon_left, default = true })
 hl.workspace_rule({ workspace = "7", monitor = mon_left })
 hl.workspace_rule({ workspace = "8", monitor = mon_left })
-hl.workspace_rule({ workspace = "9", monitor = mon_left, on_created_empty = LaunchOnce "spotify" })
-hl.workspace_rule({ workspace = "10", monitor = mon_left, on_created_empty = LaunchOnce "vesktop" })
+hl.workspace_rule({ workspace = "9", monitor = mon_left })
+hl.workspace_rule({ workspace = "10", monitor = mon_left })
+
+-- Apps opened when their workspace is created empty
+local workspace_apps = {
+    [1]  = LaunchOnce "zen-beta",
+    [9]  = LaunchOnce "spotify",
+    [10] = LaunchOnce "vesktop",
+}
+
+hl.on("workspace.created", function(ws)
+    local cmd = workspace_apps[ws.id]
+    if cmd == nil or not ws.is_empty then
+        return
+    end
+
+    -- "silent" also withholds focus, so only use it for a workspace that isn't the active
+    -- one (e.g. workspace 1 at startup when the other monitor has focus).
+    local active = hl.get_active_workspace()
+    if active ~= nil and active.id == ws.id then
+        hl.exec_cmd(cmd)
+    else
+        hl.exec_cmd(cmd, { workspace = ws.addressable_name .. " silent" })
+    end
+end)
 
 -- Smart gaps
 hl.workspace_rule({ workspace = "w[tv1]", gaps_out = 0, gaps_in = 0 })
