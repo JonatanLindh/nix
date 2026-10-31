@@ -19,6 +19,10 @@ PanelWindow {
     readonly property bool focusedHere: Hyprland.focusedMonitor?.name === modelData.name
     // Shown once the frozen frame is up and grim has the stills screenshots are cut from.
     readonly property bool shown: Screenshot.active && frame.hasContent && stills.done
+    // Only while open: a capture session opened as a monitor appears can outlive it (a dock's
+    // outputs can vanish within a second), which is a fatal protocol error from Hyprland or a
+    // dangling QScreen here. A new session grabs its first frame by itself.
+    readonly property var captureSource: Screenshot.active ? modelData : null
 
     // Selection in this monitor's logical coordinates, or null.
     property var sel: null
@@ -101,8 +105,6 @@ PanelWindow {
             if (Screenshot.active) {
                 root.sel = Screenshot.selections[root.modelData.name] ?? null;
                 root.hovered = null;
-                frame.captureFrame();
-                frameCursor.captureFrame();
                 stills.done = false;
                 stills.running = true;
             }
@@ -123,7 +125,7 @@ PanelWindow {
         id: frame
         anchors.fill: parent
         visible: root.shown && !Screenshot.pointer
-        captureSource: root.modelData
+        captureSource: root.captureSource
         live: false
         paintCursor: false
     }
@@ -133,7 +135,7 @@ PanelWindow {
         id: frameCursor
         anchors.fill: parent
         visible: root.shown && Screenshot.pointer
-        captureSource: root.modelData
+        captureSource: root.captureSource
         live: false
         paintCursor: true
     }
