@@ -79,6 +79,9 @@
     };
   };
 
+  # use sudo-rs
+  security.sudo-rs.enable = true;
+
   services = {
     fwupd.enable = true;
     printing.enable = true;
