@@ -9,6 +9,7 @@
 
   imports = [
     ./hardware-configuration.nix
+    ./mt7927-bluetooth.nix
     flake.nixosModules.common
     flake.nixosModules.graphical
   ];
