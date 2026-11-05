@@ -15,7 +15,14 @@
 #   https://www.asus.com/support/api/product.asmx/GetPDDrivers?website=global&model=ROG%20STRIX%20X870-F%20GAMING%20WIFI&osid=52
 # To update, bump `driver` and `hash`; the build prints the blob's build
 # stamp. Drop this module once linux-firmware ships the file itself:
-#   ls /run/current-system/firmware/mediatek/mt7927/  # BT_RAM_CODE_*
+#
+##CHECK: linux_firmware_has(mediatek/mt7927/BT_RAM_CODE_MT6639_2_1_hdr.bin)
+## linux-firmware now ships the MT7927 Bluetooth firmware, so this workaround
+## can go: delete hosts/desktop/mt7927-bluetooth.nix and
+## hosts/desktop/mtkwlan-extract.py, and remove the ./mt7927-bluetooth.nix
+## import from hosts/desktop/configuration.nix. In the summary, note that
+## the upstream blob may be a different vendor build than ASUS's, so
+## Bluetooth should be checked on the desktop after switching.
 { pkgs, ... }:
 let
   # MTK WiFi Driver V5.7.0.6054, released 2026-07-16.
