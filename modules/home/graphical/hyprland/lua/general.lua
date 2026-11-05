@@ -32,7 +32,7 @@ hl.config({
         gaps_out         = 5,
         border_size      = 2,
         col              = {
-            -- Quiet, matching the Quickshell glass: a soft white line, inactive barely there.
+            -- Quiet, matching the shell's glass: a soft white line, inactive barely there.
             active_border   = "rgba(ffffff59)",
             inactive_border = "rgba(ffffff14)",
         },
@@ -187,22 +187,14 @@ hl.window_rule({
 })
 
 -- Layer rules
--- Every Quickshell surface (bar, panels, launcher, OSD, popups) is translucent glass.
--- ignore_alpha keeps the blur inside the rounded corners instead of a square behind them.
 hl.layer_rule({
-    name         = "quickshell-blur",
-    match        = { namespace = "^quickshell:.*" },
-    blur         = true,
-    blur_popups  = true, -- the bar's drop-down panels
+    name         = "shell-panel-blur",
+    match        = { namespace = "^shell$" },
+    blur_popups  = true,
     ignore_alpha = 0.2,
 })
 
 -- Input devices
-hl.device({
-    name        = "epic-mouse-v1",
-    sensitivity = -0.5,
-})
-
 hl.device({
     name = "wacom-intuos-bt-m-pen",
     output = mon_right
@@ -220,7 +212,7 @@ hl.bind("SUPER + Q", hl.dsp.exec_cmd(Launch "ghostty"))
 hl.bind("SUPER + C", hl.dsp.window.close())
 hl.bind("SUPER + E", hl.dsp.exec_cmd(Launch "dolphin"))
 hl.bind("SUPER + P", hl.dsp.window.float({ action = "toggle" }))
-hl.bind("SUPER + SUPER_L", hl.dsp.global("quickshell:launcher"), { release = true }) -- app launcher (quickshell)
+hl.bind("SUPER + SUPER_L", hl.dsp.exec_cmd("shell msg launcher"), { release = true }) -- app launcher
 hl.bind("SUPER + J", hl.dsp.group.toggle())
 hl.bind("SUPER + F", hl.dsp.window.fullscreen(0))
 hl.bind("SUPER + L", function()
@@ -231,13 +223,13 @@ hl.bind("SUPER + L", function()
         Debug("Layout (" .. ws.name .. "): " .. next_layout)
     end
 end)
-hl.bind("SUPER + M", hl.dsp.global("quickshell:session"))             -- session menu (quickshell)
-hl.bind("SUPER + V", hl.dsp.global("quickshell:clip"))                -- clipboard history (quickshell)
-hl.bind("SUPER + N", hl.dsp.global("quickshell:notif"))               -- notification history (quickshell)
-hl.bind("SUPER + SHIFT + P", hl.dsp.global("quickshell:op"))          -- 1password (quickshell)
-hl.bind("SUPER + SHIFT + C", hl.dsp.global("quickshell:picker"))      -- colour picker (quickshell)
-hl.bind("SUPER + D", hl.dsp.global("quickshell:shelf"))               -- drag shelf (quickshell)
-hl.bind("SUPER + SHIFT + D", hl.dsp.global("quickshell:shelf-paste")) -- clipboard onto the shelf
+hl.bind("SUPER + M", hl.dsp.exec_cmd("shell msg session"))        -- session menu
+hl.bind("SUPER + V", hl.dsp.exec_cmd("shell msg clip"))           -- clipboard history
+hl.bind("SUPER + N", hl.dsp.exec_cmd("shell msg notifications"))  -- notification history
+hl.bind("SUPER + SHIFT + P", hl.dsp.exec_cmd("shell msg op"))     -- 1password
+hl.bind("SUPER + SHIFT + C", hl.dsp.exec_cmd("shell msg picker")) -- colour picker
+hl.bind("SUPER + D", hl.dsp.exec_cmd("shell msg shelf"))          -- drag shelf
+hl.bind("SUPER + SHIFT + D", hl.dsp.exec_cmd("shell msg paste"))  -- clipboard onto the shelf
 
 hl.bind("SUPER + left", hl.dsp.focus({ direction = "left" }))
 hl.bind("SUPER + right", hl.dsp.focus({ direction = "right" }))
@@ -272,11 +264,12 @@ hl.bind("XF86MonBrightnessUp", hl.dsp.exec_cmd(Launch "brightnessctl -e4 -n2 set
 hl.bind("XF86MonBrightnessDown", hl.dsp.exec_cmd(Launch "brightnessctl -e4 -n2 set 5%-"),
     { locked = true, repeating = true })
 
-hl.bind("XF86AudioNext", hl.dsp.exec_cmd(Launch "playerctl next"), { locked = true })
-hl.bind("XF86AudioPause", hl.dsp.exec_cmd(Launch "playerctl play-pause"), { locked = true })
-hl.bind("XF86AudioPlay", hl.dsp.exec_cmd(Launch "playerctl play-pause"), { locked = true })
-hl.bind("XF86AudioPrev", hl.dsp.exec_cmd(Launch "playerctl previous"), { locked = true })
+-- To the player the shell's now-playing card shows, so the keys and the card agree.
+hl.bind("XF86AudioNext", hl.dsp.exec_cmd("shell msg next"), { locked = true })
+hl.bind("XF86AudioPause", hl.dsp.exec_cmd("shell msg play-pause"), { locked = true })
+hl.bind("XF86AudioPlay", hl.dsp.exec_cmd("shell msg play-pause"), { locked = true })
+hl.bind("XF86AudioPrev", hl.dsp.exec_cmd("shell msg previous"), { locked = true })
 
-hl.bind("PRINT", hl.dsp.global("quickshell:screenshot"))                        -- capture overlay, selection (quickshell)
-hl.bind("SUPER + PRINT", hl.dsp.global("quickshell:screenshot-window"))         -- capture overlay, window mode
-hl.bind("SUPER + SHIFT + PRINT", hl.dsp.global("quickshell:screenshot-screen")) -- capture overlay, screen mode
+hl.bind("PRINT", hl.dsp.exec_cmd("shell msg screenshot"))                        -- capture overlay, selection
+hl.bind("SUPER + PRINT", hl.dsp.exec_cmd("shell msg screenshot-window"))         -- capture overlay, window mode
+hl.bind("SUPER + SHIFT + PRINT", hl.dsp.exec_cmd("shell msg screenshot-screen")) -- capture overlay, screen mode

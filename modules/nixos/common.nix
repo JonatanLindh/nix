@@ -170,7 +170,7 @@
       corefonts
       vista-fonts
       inter
-      geist-font # the Quickshell bar (Geist + Geist Mono)
+      geist-font # the shell (Geist + Geist Mono)
       newcomputermodern # the launcher calculator's typeset results (New Computer Modern Math, as in Typst)
       nerd-fonts.symbols-only
       nerd-fonts.fira-code
@@ -179,7 +179,7 @@
 
     fontconfig = {
       enable = true;
-      # Anything asking for "monospace" (the quickshell bar, ...) follows this.
+      # Anything asking for "monospace" follows this.
       defaultFonts.monospace = [ "JetBrainsMono Nerd Font" ];
     };
   };

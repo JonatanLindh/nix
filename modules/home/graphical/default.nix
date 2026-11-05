@@ -2,7 +2,7 @@
 {
   imports = [
     ./hyprland
-    ./quickshell
+    ../../../packages/shell/home.nix
     ./theme.nix
     ./browser.nix
     ./easyeffects

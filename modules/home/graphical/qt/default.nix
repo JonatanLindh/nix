@@ -39,7 +39,7 @@ let
 
   kvantum = pkgs.kdePackages.qtstyleplugin-kvantum;
 
-  # The Quickshell Glass palette (quickshell/config/Theme.qml). Kvantum takes
+  # The shell's glass palette (packages/shell/src/theme.rs). Kvantum takes
   # #rrggbbaa; KColorScheme can't do alpha, so `solid` is each fill over the glass.
   glass = {
     bg = "#0e1a1e";
@@ -72,7 +72,7 @@ let
         settings = builtins.toJSON {
           "%General" = {
             author = "Generated from KvArcDark";
-            comment = "Translucent dark glass, matching the Quickshell bar";
+            comment = "Translucent dark glass, matching the shell";
             translucent_windows = true;
             # More solid than the shell's panels (Theme.glass is 0.62): file lists
             # need to stay readable over a busy wallpaper. Higher = more see-through.

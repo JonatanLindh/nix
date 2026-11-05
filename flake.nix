@@ -41,6 +41,10 @@
       flake = false;
     };
 
+    # Builds the desktop shell's dependencies (packages/shell) in a derivation of their own, so a
+    # change to the shell doesn't rebuild them.
+    crane.url = "github:ipetkov/crane";
+
     nixos-vscode-server = {
       url = "github:msteen/nixos-vscode-server";
       flake = false;

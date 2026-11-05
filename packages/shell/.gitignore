@@ -1,0 +1,19 @@
+# Cargo's build output
+target/
+
+# Devenv, and what it generates for Claude Code (claude.code.enable)
+.devenv*
+devenv.local.nix
+devenv.local.yaml
+.claude/
+.mcp.json
+
+# direnv
+.direnv
+.envrc
+
+# pre-commit
+.pre-commit-config.yaml
+
+# Patched crates, linked from the Nix store by devenv
+.patched/

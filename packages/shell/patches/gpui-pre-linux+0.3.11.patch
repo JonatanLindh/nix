@@ -1,0 +1,63 @@
+diff --git a/src/linux/wayland/window.rs b/src/linux/wayland/window.rs
+index 6647a8e..b31d227 100644
+--- a/src/linux/wayland/window.rs
++++ b/src/linux/wayland/window.rs
+@@ -41,7 +41,7 @@ use gpui::{
+     PromptLevel, RequestFrameOptions, ResizeEdge, Scene, Size, Tiling, WindowAppearance,
+     WindowBackgroundAppearance, WindowBounds, WindowControlArea, WindowControls, WindowDecorations,
+     WindowKind, WindowParams, WindowVisibility,
+-    layer_shell::{Anchor, LayerShellNotSupportedError},
++    layer_shell::{Anchor, KeyboardInteractivity, LayerShellNotSupportedError},
+     popup::PopupOptions,
+     px, size,
+ };
+@@ -1542,8 +1542,15 @@ impl WaylandWindowStatePtr {
+         }
+ 
+         let state = self.state.borrow_mut();
+-        if let Some(viewport) = &state.viewport {
+-            viewport.set_destination(f32::from(size.width) as i32, f32::from(size.height) as i32);
++        // A layer surface that stretches between its anchors is 0 along that side until its
++        // first configure, and a fractional scale can arrive before then: a 0 destination is a
++        // protocol error, so wait for a real size.
++        let (width, height) = (f32::from(size.width) as i32, f32::from(size.height) as i32);
++        if let Some(viewport) = &state.viewport
++            && width > 0
++            && height > 0
++        {
++            viewport.set_destination(width, height);
+         }
+         update_window(state);
+     }
+@@ -2144,6 +2151,19 @@ impl PlatformWindow for WaylandWindow {
+         }
+     }
+ 
++    fn set_keyboard_interactivity(&self, keyboard_interactivity: KeyboardInteractivity) {
++        let state = self.borrow();
++        let Some(layer_surface) = state.surface_state.layer_surface() else {
++            return;
++        };
++        layer_surface.set_keyboard_interactivity(
++            super::layer_shell::wayland_keyboard_interactivity(keyboard_interactivity),
++        );
++        // Commit to apply it immediately, otherwise it only takes effect
++        // on the next frame.
++        state.surface.commit();
++    }
++
+     fn set_input_region(&self, region: Option<&[Bounds<Pixels>]>) {
+         let state = self.borrow();
+         match region {
+@@ -2178,6 +2198,11 @@ impl PlatformWindow for WaylandWindow {
+ 
+     fn window_decorations(&self) -> Decorations {
+         let state = self.borrow();
++        // Layer surfaces and popups have no decorations to speak of: reporting client-side ones
++        // makes apps inset them for a shadow and draw a frame.
++        if !matches!(state.surface_state, WaylandSurfaceState::Xdg(_)) {
++            return Decorations::Server;
++        }
+         match state.decorations {
+             WindowDecorations::Server => Decorations::Server,
+             WindowDecorations::Client => Decorations::Client {

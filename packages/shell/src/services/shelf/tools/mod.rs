@@ -1,0 +1,309 @@
+//! One-shot actions: each takes files, runs the right CLI tool and reports what it made.
+//! Long-lived shares (funnel, wormhole) live in `crate::services::shelf::jobs`.
+
+mod archive;
+mod image;
+mod pdf;
+mod video;
+
+use std::{
+    ffi::OsStr,
+    path::{Path, PathBuf},
+    process::{Output, Stdio},
+};
+
+use anyhow::{Context, bail};
+use tokio::process::Command;
+
+pub use archive::zip_to;
+
+use crate::services::shelf::{
+    files::{Kind, kind_of, link_url, plural},
+    jobs::JobInfo,
+    qr::{self, Qr},
+};
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct LinkQr {
+    /// What's encoded: a link's address or a note's text.
+    pub text: String,
+    pub qr: Qr,
+}
+
+/// What an action did, as printed for the UI.
+#[derive(Debug, Default)]
+pub struct Outcome {
+    pub ok: bool,
+    pub message: String,
+    /// New files/folders, to be added to the shelf.
+    pub outputs: Vec<String>,
+    /// Items the UI should select (when not `outputs`).
+    pub select: Vec<String>,
+    /// Text the UI should put on the clipboard.
+    pub copy: Option<String>,
+    /// A QR code for the UI to show (a link's address).
+    pub qr: Option<LinkQr>,
+    /// A share that keeps running after this call.
+    pub job: Option<JobInfo>,
+}
+
+impl Outcome {
+    pub fn made(message: impl Into<String>, outputs: Vec<PathBuf>) -> Self {
+        Self {
+            ok: true,
+            message: message.into(),
+            outputs: outputs
+                .iter()
+                .map(|p| p.to_string_lossy().into_owned())
+                .collect(),
+            ..Self::default()
+        }
+    }
+
+    pub fn said(message: impl Into<String>) -> Self {
+        Self {
+            ok: true,
+            message: message.into(),
+            ..Self::default()
+        }
+    }
+
+    pub fn failed(message: impl Into<String>) -> Self {
+        Self {
+            ok: false,
+            message: message.into(),
+            ..Self::default()
+        }
+    }
+}
+
+pub async fn run(action: &str, opt: &str, files: &[PathBuf]) -> anyhow::Result<Outcome> {
+    if files.is_empty() {
+        bail!("No files");
+    }
+    if let Some(missing) = files.iter().find(|f| !f.exists()) {
+        bail!(
+            "{} no longer exists",
+            crate::services::shelf::files::name(missing)
+        );
+    }
+    match action {
+        "convert" => image::convert(files, opt).await,
+        "resize" => image::resize(files, opt).await,
+        "strip" => image::strip(files).await,
+        "ocr" => image::ocr(files).await,
+        "merge" => pdf::merge(files).await,
+        "compress" => pdf::compress(files).await,
+        "split" => pdf::split(files).await,
+        "shrink" => video::shrink(files).await,
+        "gif" => video::gif(files).await,
+        "extract" => archive::extract(files).await,
+        "archive" => archive::archive(files).await,
+        "open" => open(files),
+        "localsend" => localsend(files).await,
+        "taildrop" => taildrop(files, opt).await,
+        "copy-url" => {
+            let urls = links(files)?;
+            Ok(Outcome {
+                copy: Some(urls.join("\n")),
+                ..Outcome::said(if urls.len() == 1 {
+                    "Copied URL".to_string()
+                } else {
+                    format!("Copied {}", plural(urls.len(), "URL"))
+                })
+            })
+        }
+        "qr" => {
+            let [file] = files else {
+                bail!("Pick one link or note");
+            };
+            let (text, message) = match kind_of(&file.to_string_lossy()) {
+                Kind::Text => {
+                    if size_of(file) > crate::services::shelf::actions::QR_TEXT_MAX {
+                        bail!("Too much text for a QR code");
+                    }
+                    let text = std::fs::read_to_string(file).context("Not plain text")?;
+                    (text.trim_end().to_string(), "Scan to read it on your phone")
+                }
+                _ => (links(files)?.remove(0), "Scan to open on your phone"),
+            };
+            Ok(Outcome {
+                qr: Some(LinkQr {
+                    qr: qr::encode(&text)?,
+                    text,
+                }),
+                ..Outcome::said(message)
+            })
+        }
+        "copy-text" => {
+            let texts = files
+                .iter()
+                .map(|f| {
+                    std::fs::read_to_string(f)
+                        .map(|t| t.trim_end().to_string())
+                        .with_context(|| {
+                            format!(
+                                "{} isn't plain text",
+                                crate::services::shelf::files::name(f)
+                            )
+                        })
+                })
+                .collect::<anyhow::Result<Vec<_>>>()?;
+            Ok(Outcome {
+                copy: Some(texts.join("\n\n")),
+                ..Outcome::said("Copied text")
+            })
+        }
+        "copy-paths" => Ok(Outcome {
+            copy: Some(
+                files
+                    .iter()
+                    .map(|f| f.to_string_lossy())
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+            ),
+            ..Outcome::said(format!("Copied {}", plural(files.len(), "path")))
+        }),
+        _ => bail!("Unknown action “{action}”"),
+    }
+}
+
+/// The addresses in link files; an error if one isn't a link.
+fn links(files: &[PathBuf]) -> anyhow::Result<Vec<String>> {
+    files
+        .iter()
+        .map(|f| {
+            link_url(f).with_context(|| {
+                format!(
+                    "{} has no web address",
+                    crate::services::shelf::files::name(f)
+                )
+            })
+        })
+        .collect()
+}
+
+fn open(files: &[PathBuf]) -> anyhow::Result<Outcome> {
+    for f in files {
+        // A link opens its address (in the browser), not the shortcut file.
+        let target = match kind_of(&f.to_string_lossy()) {
+            Kind::Link => link_url(f).map_or_else(|| f.as_os_str().to_owned(), Into::into),
+            _ => f.as_os_str().to_owned(),
+        };
+        let mut cmd = if which("uwsm-app") {
+            let mut c = Command::new("uwsm-app");
+            c.args(["--", "xdg-open"]);
+            c
+        } else {
+            Command::new("xdg-open")
+        };
+        let mut child = cmd
+            .arg(target)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .map_err(|e| not_found("xdg-open", e))?;
+        tokio::spawn(async move { child.wait().await });
+    }
+    Ok(Outcome::said(format!(
+        "Opened {}",
+        plural(files.len(), "file")
+    )))
+}
+
+async fn localsend(files: &[PathBuf]) -> anyhow::Result<Outcome> {
+    // Through uwsm so the app gets its own scope instead of living (and dying) in ours.
+    let mut cmd = if which("uwsm-app") {
+        let mut c = Command::new("uwsm-app");
+        c.args(["--", "localsend_app"]);
+        c
+    } else {
+        Command::new("localsend_app")
+    };
+    let mut child = cmd
+        .args(files)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .map_err(|e| not_found("localsend_app", e))?;
+    // Reap it whenever it exits.
+    tokio::spawn(async move { child.wait().await });
+    Ok(Outcome::said(format!(
+        "Opened LocalSend with {}",
+        plural(files.len(), "file")
+    )))
+}
+
+async fn taildrop(files: &[PathBuf], peer: &str) -> anyhow::Result<Outcome> {
+    if peer.is_empty() {
+        bail!("Pick a device to send to");
+    }
+    let mut args: Vec<&OsStr> = vec!["file".as_ref(), "cp".as_ref()];
+    args.extend(files.iter().map(|f| f.as_os_str()));
+    let target = format!("{peer}:");
+    args.push(target.as_ref());
+    exec("tailscale", args).await?;
+    Ok(Outcome::said(format!(
+        "Sent {} to {peer}",
+        plural(files.len(), "file")
+    )))
+}
+
+fn which(program: &str) -> bool {
+    std::env::var_os("PATH")
+        .is_some_and(|path| std::env::split_paths(&path).any(|d| d.join(program).is_file()))
+}
+
+fn not_found(program: &str, e: std::io::Error) -> anyhow::Error {
+    if e.kind() == std::io::ErrorKind::NotFound {
+        anyhow::anyhow!("{program} isn't installed")
+    } else {
+        anyhow::anyhow!("Couldn't start {program}: {e}")
+    }
+}
+
+/// Runs a program to completion; a non-zero exit becomes an error carrying its last
+/// line of stderr, which is usually the useful one.
+pub async fn exec<I, S>(program: &str, args: I) -> anyhow::Result<Output>
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
+    let out = Command::new(program)
+        .args(args)
+        .stdin(Stdio::null())
+        .kill_on_drop(true)
+        .output()
+        .await
+        .map_err(|e| not_found(program, e))?;
+    if !out.status.success() {
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        let last = stderr
+            .lines()
+            .rev()
+            .find(|l| !l.trim().is_empty())
+            .unwrap_or("")
+            .trim();
+        bail!(
+            "{program} failed{}{last}",
+            if last.is_empty() { "" } else { ": " }
+        );
+    }
+    Ok(out)
+}
+
+/// Like `exec`, returning stdout as text.
+pub async fn output<I, S>(program: &str, args: I) -> anyhow::Result<String>
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
+    let out = exec(program, args).await?;
+    String::from_utf8(out.stdout).with_context(|| format!("{program} printed non-UTF-8"))
+}
+
+fn size_of(path: &Path) -> u64 {
+    std::fs::metadata(path).map(|m| m.len()).unwrap_or(0)
+}

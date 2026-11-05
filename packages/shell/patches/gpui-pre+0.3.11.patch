@@ -1,0 +1,115 @@
+diff --git a/src/platform.rs b/src/platform.rs
+index 6ddbac4..c8dce1a 100644
+--- a/src/platform.rs
++++ b/src/platform.rs
+@@ -1386,6 +1386,12 @@ pub trait PlatformWindow: HasWindowHandle + HasDisplayHandle {
+     fn set_exclusive_zone(&self, _zone: Pixels) {}
+     #[cfg(all(target_os = "linux", feature = "wayland"))]
+     fn set_exclusive_edge(&self, _edge: layer_shell::Anchor) {}
++    #[cfg(all(target_os = "linux", feature = "wayland"))]
++    fn set_keyboard_interactivity(
++        &self,
++        _keyboard_interactivity: layer_shell::KeyboardInteractivity,
++    ) {
++    }
+     fn set_input_region(&self, _region: Option<&[Bounds<Pixels>]>) {}
+     fn window_decorations(&self) -> Decorations {
+         Decorations::Server
+diff --git a/src/window.rs b/src/window.rs
+index c2ba13d..c172e01 100644
+--- a/src/window.rs
++++ b/src/window.rs
+@@ -1260,6 +1260,9 @@ pub struct Window {
+     focus_lost_path: SmallVec<[FocusId; 8]>,
+     default_prevented: bool,
+     mouse_position: Point<Pixels>,
++    /// The pointer isn't in the window: it left, or hasn't entered since the window opened.
++    /// `mouse_position` is stale then (or another surface's), and nothing is under the pointer.
++    pointer_left: bool,
+     mouse_hit_test: HitTest,
+     modifiers: Modifiers,
+     capslock: Capslock,
+@@ -2383,6 +2386,7 @@ impl Window {
+             focus_lost_path: SmallVec::new(),
+             default_prevented: true,
+             mouse_position,
++            pointer_left: true,
+             mouse_hit_test: HitTest::default(),
+             modifiers,
+             capslock,
+@@ -2714,6 +2718,18 @@ impl Window {
+         self.platform_window.set_exclusive_edge(edge);
+     }
+ 
++    /// Set how a layer-shell surface receives keyboard focus. Changes are committed
++    /// immediately. This is ignored for other window kinds. (Wayland layer-shell
++    /// windows only)
++    #[cfg(all(target_os = "linux", feature = "wayland"))]
++    pub fn set_keyboard_interactivity(
++        &self,
++        keyboard_interactivity: crate::layer_shell::KeyboardInteractivity,
++    ) {
++        self.platform_window
++            .set_keyboard_interactivity(keyboard_interactivity);
++    }
++
+     /// Start an interactive window resize operation if this window is resizable.
+     pub fn start_window_resize(&self, edge: ResizeEdge) {
+         if self.is_resizable {
+@@ -3964,7 +3980,7 @@ impl Window {
+             tooltip_element = self.prepaint_tooltip(cx);
+         }
+ 
+-        self.mouse_hit_test = self.next_frame.hit_test(self.mouse_position);
++        self.mouse_hit_test = self.hit_test_pointer(&self.next_frame);
+ 
+         // Now actually paint the elements.
+         #[cfg(feature = "profiler")]
+@@ -5862,6 +5878,28 @@ impl Window {
+         // Handlers may set this to true by calling `prevent_default`.
+         self.default_prevented = false;
+ 
++        // The platform reports no position on leaving, so `mouse_position` keeps the last one
++        // inside. Without this, a frame drawn before the pointer comes back would hit-test that
++        // stale position and show whatever was under it as hovered again. Any event that puts
++        // the pointer somewhere in the window, a drag from another app included, ends it.
++        match &event {
++            PlatformInput::MouseExited(_) => self.pointer_left = true,
++            PlatformInput::MouseMove(_)
++            | PlatformInput::MouseDown(_)
++            | PlatformInput::MouseUp(_)
++            | PlatformInput::Scroll(_)
++            | PlatformInput::Pinch(_)
++            | PlatformInput::LongPress(_)
++            | PlatformInput::TouchDrag(_)
++            | PlatformInput::BackGesture(_)
++            | PlatformInput::FileDrop(
++                FileDropEvent::Entered { .. }
++                | FileDropEvent::Pending { .. }
++                | FileDropEvent::Submit { .. },
++            ) => self.pointer_left = false,
++            _ => {}
++        }
++
+         let event = match event {
+             // Track the mouse position with our own state, since accessing the platform
+             // API for the mouse position can only occur on the main thread.
+@@ -6186,8 +6224,17 @@ impl Window {
+         });
+     }
+ 
++    /// What's under the pointer in `frame`: nothing while it's outside the window.
++    fn hit_test_pointer(&self, frame: &Frame) -> HitTest {
++        if self.pointer_left {
++            HitTest::default()
++        } else {
++            frame.hit_test(self.mouse_position)
++        }
++    }
++
+     fn dispatch_mouse_event(&mut self, event: &dyn Any, cx: &mut App) {
+-        let hit_test = self.rendered_frame.hit_test(self.mouse_position());
++        let hit_test = self.hit_test_pointer(&self.rendered_frame);
+         if hit_test != self.mouse_hit_test {
+             self.mouse_hit_test = hit_test;
+             self.reset_cursor_style(cx);
