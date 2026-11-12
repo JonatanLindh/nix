@@ -223,6 +223,11 @@ in
           GSSAPIAuthentication = "yes";
           GSSAPIDelegateCredentials = "yes";
         };
+        "router" = {
+          Hostname = "100.68.100.80";
+          User = "root";
+          IdentityFile = "~/.ssh/id_ed25519";
+        };
         "*" = {
           WarnWeakCrypto = "no-pq-kex";
           SetEnv = {
