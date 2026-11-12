@@ -78,6 +78,7 @@
         mechatroner.rainbow-csv
         ms-vscode-remote.remote-ssh
         charliermarsh.ruff
+        astral-sh.ty
       ];
     };
   };
