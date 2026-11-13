@@ -85,6 +85,7 @@
       allowedTCPPorts = [
         3000
         8080
+        25565 # Minecraft
         57621 # Spotify
       ];
 
