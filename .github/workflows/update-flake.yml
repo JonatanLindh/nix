@@ -169,7 +169,9 @@ jobs:
         if: steps.eval.outcome == 'failure' || steps.eval.outputs.warnings == 'true'
         run: |
           git checkout -- flake.lock .github
-          git add -A -- . ':!eval-*.log' ':!claude-summary.md' ':!.github'
+          # Scratch files (eval-*.log, claude-*.md) are gitignored. Don't
+          # name them in exclude pathspecs: git add exits 1 on ignored paths.
+          git add -A -- . ':!.github'
           if git diff --cached --quiet; then
             echo "fixed=false" >> "$GITHUB_OUTPUT"
           else
@@ -242,7 +244,7 @@ jobs:
           # Drop lock entries for inputs Claude removed. Without
           # --update-input this only adds/removes inputs, it updates nothing.
           nix flake lock
-          git add -A -- . ':!eval-*.log' ':!claude-summary.md' ':!claude-checks-summary.md' ':!checks-todo.md' ':!.github'
+          git add -A -- . ':!.github'
           if git diff --cached --quiet; then
             echo "resolved=false" >> "$GITHUB_OUTPUT"
           else
