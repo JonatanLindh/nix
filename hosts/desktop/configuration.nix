@@ -190,10 +190,13 @@
   };
 
   # Scheduler
-  services.scx = {
+  services.scx-loader = {
     enable = true;
-    scheduler = "scx_lavd";
-    extraArgs = [ "--autopilot" ];
+    config = {
+      default_sched = "scx_lavd";
+      default_mode = "Auto";
+      scheds.scx_lavd.auto_mode = [ "--autopilot" ];
+    };
   };
 
   # Remote builds from the xps nix-daemon (passphrase-less key in /etc/nix/builder_ed25519),
