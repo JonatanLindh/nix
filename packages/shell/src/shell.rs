@@ -9,7 +9,7 @@ use gpui::component::Root;
 use gpui::{
     AnyView, AnyWindowHandle, App, AppContext, Bounds, Context, DisplayId, Entity, Global, Pixels, Size,
     Subscription, Window, WindowBackgroundAppearance, WindowBounds, WindowHandle, WindowKind,
-    WindowOptions, layer_shell::LayerShellOptions, point,
+    WindowId, WindowOptions, layer_shell::LayerShellOptions, point,
 };
 use uuid::Uuid;
 
@@ -60,6 +60,13 @@ impl Shell {
                 cx.observe_displays(|_: gpui::DisplayEvent, cx: &mut App| {
                     Self::global(cx).update(cx, |shell, cx| shell.sync_bars(cx))
                 }),
+                // The compositor closes a bar whose output went away (monitors off, sleep), and
+                // the output may come back under the same display id: open it again.
+                cx.on_window_closed(|cx: &mut App, id: WindowId| {
+                    cx.defer(move |cx| {
+                        Self::global(cx).update(cx, |shell, cx| shell.bar_closed(id, cx))
+                    });
+                }),
                 // Popups follow the focused monitor.
                 cx.observe(&hypr, |shell: &mut Self, _, cx| shell.place_popups(cx)),
             ];
@@ -101,11 +108,25 @@ impl Shell {
         .detach();
     }
 
-    /// Opens a bar on each new display and closes those whose display is gone.
+    /// A window closed: if it was a bar's, its display gets a new one.
+    fn bar_closed(&mut self, window: WindowId, cx: &mut Context<Self>) {
+        let before = self.bars.len();
+        self.bars.retain(|_, bar| bar.window.window_id() != window);
+        if self.bars.len() != before {
+            self.sync_bars(cx);
+        }
+    }
+
+    /// Opens a bar on each new display and closes those whose display is gone. A display id is
+    /// the output's Wayland object id, which a later output can reuse: a bar is kept only while
+    /// its id still names the same output.
     fn sync_bars(&mut self, cx: &mut Context<Self>) {
         let displays = cx.displays();
         self.bars.retain(|id, bar| {
-            let keep = displays.iter().any(|d| d.id() == *id);
+            let uuid = bar.bar.read(cx).uuid;
+            let keep = displays
+                .iter()
+                .any(|d| d.id() == *id && d.uuid().ok() == uuid);
             if !keep {
                 bar.bar.update(cx, |bar, cx| bar.close_panel(cx));
                 close_window(bar.window, cx);

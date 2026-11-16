@@ -1,8 +1,7 @@
 diff --git a/src/linux/wayland/window.rs b/src/linux/wayland/window.rs
-index 6647a8e..b31d227 100644
 --- a/src/linux/wayland/window.rs
 +++ b/src/linux/wayland/window.rs
-@@ -41,7 +41,7 @@ use gpui::{
+@@ -41,7 +41,7 @@
      PromptLevel, RequestFrameOptions, ResizeEdge, Scene, Size, Tiling, WindowAppearance,
      WindowBackgroundAppearance, WindowBounds, WindowControlArea, WindowControls, WindowDecorations,
      WindowKind, WindowParams, WindowVisibility,
@@ -11,7 +10,32 @@ index 6647a8e..b31d227 100644
      popup::PopupOptions,
      px, size,
  };
-@@ -1542,8 +1542,15 @@ impl WaylandWindowStatePtr {
+@@ -1164,12 +1164,18 @@
+             .map(|v| f32::from(v) as i32)
+             .map_size(|v| if v <= 0 { 1 } else { v });
+ 
+-            state.surface_state.set_geometry(
+-                window_geometry.origin.x,
+-                window_geometry.origin.y,
+-                window_geometry.size.width,
+-                window_geometry.size.height,
+-            );
++            // A layer surface's "geometry" is its requested size, which the compositor's
++            // configure answers: echoing the configured size back replaces a 0 (stretch between
++            // anchors) with whatever the compositor last sent, so a surface that once got an odd
++            // configure (an output going away) keeps that size for good. Leave the request alone.
++            if state.surface_state.layer_surface().is_none() {
++                state.surface_state.set_geometry(
++                    window_geometry.origin.x,
++                    window_geometry.origin.y,
++                    window_geometry.size.width,
++                    window_geometry.size.height,
++                );
++            }
+ 
+             let initial_configure = self.frame_loop.get() == FrameLoop::Unconfigured;
+             update_window(state);
+@@ -1542,8 +1548,15 @@
          }
  
          let state = self.state.borrow_mut();
@@ -29,7 +53,7 @@ index 6647a8e..b31d227 100644
          }
          update_window(state);
      }
-@@ -2144,6 +2151,19 @@ impl PlatformWindow for WaylandWindow {
+@@ -2144,6 +2157,19 @@
          }
      }
  
@@ -49,7 +73,7 @@ index 6647a8e..b31d227 100644
      fn set_input_region(&self, region: Option<&[Bounds<Pixels>]>) {
          let state = self.borrow();
          match region {
-@@ -2178,6 +2198,11 @@ impl PlatformWindow for WaylandWindow {
+@@ -2178,6 +2204,11 @@
  
      fn window_decorations(&self) -> Decorations {
          let state = self.borrow();
