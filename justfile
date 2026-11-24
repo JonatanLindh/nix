@@ -2,7 +2,7 @@
 default:
     @just --list
 
-# Evaluate both hosts without building (same check as CI); skipped if these contents already passed
+# Evaluate both hosts and check their Hyprland configs (same check as CI); skipped if these contents already passed
 check:
     @.github/scripts/checks.py --validate
     .github/scripts/eval-hosts.sh

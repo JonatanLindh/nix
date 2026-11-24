@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Evaluate every host's system derivation without building it.
+# Evaluate every host's system derivation without building it, then check
+# its generated Hyprland config with its Hyprland (verify-hyprland.sh; this
+# builds only the config files and fetches Hyprland).
 # Writes the output per host to eval-<host>.log and fails if any host fails.
 # Evaluation warnings do not fail the script; they are reported as the
 # `warnings` step output when run in GitHub Actions.
@@ -35,6 +37,13 @@ for host in "${hosts[@]}"; do
     echo "$host: ok"
     # Locally the log is only interesting when something is wrong
     [ -n "$ci" ] && cat "eval-$host.log" && echo
+    if ! .github/scripts/verify-hyprland.sh "$host" >"hyprland-$host.log" 2>&1; then
+      echo "$host: Hyprland config FAILED"
+      status=1
+      # Into the eval log too, which is what gets handed on to fix things
+      tee -a "eval-$host.log" <"hyprland-$host.log"
+      echo
+    fi
   else
     echo "$host: FAILED"
     status=1

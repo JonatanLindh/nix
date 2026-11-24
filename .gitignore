@@ -1,5 +1,6 @@
 # Written by .github/scripts/eval-hosts.sh and the update workflow
 eval-*.log
+hyprland-*.log
 claude-summary.md
 claude-checks-summary.md
 checks-todo.md

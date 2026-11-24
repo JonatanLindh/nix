@@ -66,6 +66,10 @@ jobs:
         if: steps.pr.outputs.found == 'true'
         with:
           github_access_token: ${{ github.token }}
+          # Hyprland for the config check in eval-hosts.sh, instead of building it
+          extra_nix_config: |
+            extra-substituters = https://hyprland.cachix.org
+            extra-trusted-public-keys = hyprland.cachix.org-1:a7pgxzMz7+chwVL3/pzj6jIBMioiJM7ypFP8PwtkuGc=
 
       - name: Compare with the base branch
         if: steps.pr.outputs.found == 'true'

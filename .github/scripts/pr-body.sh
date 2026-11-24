@@ -32,10 +32,10 @@ INPUTS=${INPUTS:-} CHECKS_JSON=${CHECKS_JSON:-} EXTRA=${EXTRA:-}
 json_or_empty() { if [ -s "${1:-}" ]; then cat "$1"; else echo '{}'; fi; }
 
 if [ "$EVAL" = success ]; then
-  status="Both hosts evaluate."
+  status="Both hosts evaluate and their Hyprland configs pass \`--verify-config\`."
   ok=true
 else
-  status="**Evaluation fails.** Not safe to merge as is."
+  status="**Evaluation or the Hyprland config check fails.** Not safe to merge as is."
   ok=false
 fi
 if [ "$FIXED" = true ]; then

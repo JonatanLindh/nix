@@ -46,6 +46,10 @@ jobs:
       - uses: cachix/install-nix-action@v31
         with:
           github_access_token: ${{ github.token }}
+          # Hyprland for the config check in eval-hosts.sh, instead of building it
+          extra_nix_config: |
+            extra-substituters = https://hyprland.cachix.org
+            extra-trusted-public-keys = hyprland.cachix.org-1:a7pgxzMz7+chwVL3/pzj6jIBMioiJM7ypFP8PwtkuGc=
 
       - name: Versions before
         run: nix eval --json .#nixosConfigurations --apply "$VERSIONS_EXPR" > "$RUNNER_TEMP/before.json" || echo '{}' > "$RUNNER_TEMP/before.json"
@@ -133,13 +137,17 @@ jobs:
           prompt: |
             This is a NixOS + home-manager flake for two hosts (desktop, xps).
             flake.lock was just updated and the configuration now fails to
-            evaluate or evaluates with warnings.
+            evaluate, evaluates with warnings, or its Hyprland config no longer
+            passes the new Hyprland's `--verify-config`.
 
             Run `.github/scripts/eval-hosts.sh` to reproduce. It evaluates both
-            hosts and writes the output to eval-desktop.log and eval-xps.log.
+            hosts, checks each host's generated Hyprland config with that
+            host's Hyprland, and writes the output to eval-desktop.log and
+            eval-xps.log.
 
-            Fix the Nix files so that both hosts evaluate without errors and
-            without evaluation warnings, then re-run the script to confirm.
+            Fix the files so that both hosts evaluate without errors and
+            without evaluation warnings and the Hyprland config check passes,
+            then re-run the script to confirm.
 
             Rules:
             - Errors come first. Only fix warnings caused by this repository's
@@ -150,6 +158,16 @@ jobs:
               usual cause is an option or package that was renamed, moved or
               removed upstream; find the replacement in the nixpkgs or
               home-manager source under /nix/store and use it.
+            - Hyprland follows its master branch, so its Lua config API can
+              change. The config lives in modules/home/graphical/hyprland/
+              (lua/*.lua and default.nix). The check's output names the new
+              Hyprland's API stubs (share/hypr/stubs) and example config
+              (share/hypr/hyprland.lua); read those for the replacement. The
+              Hyprland source is the `hyprland` flake input: `nix eval --raw
+              --impure --expr '(builtins.getFlake (toString ./.)).inputs.hyprland.outPath'`.
+              The check only proves the config loads; keybind callbacks and
+              dispatchers run later, so check the names you use against the
+              stubs as well.
             - Do not get the config to evaluate by deleting or disabling
               functionality. If something has no replacement, leave it broken
               and explain why in your final message.
