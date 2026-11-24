@@ -90,9 +90,8 @@ in
           backends.ssh.allowed-signers = "${allowedSigners}";
         };
 
-        git = {
-          sign-on-push = true;
-        };
+        # Sign my own unsigned commits when pushing.
+        revsets.git-sign-on-push = "~signed() & mine()";
       };
     };
 
