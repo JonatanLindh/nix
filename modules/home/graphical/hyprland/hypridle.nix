@@ -8,6 +8,10 @@
         lock_cmd = "pidof hyprlock || uwsm-app -- hyprlock";
         after_sleep_cmd = "hyprctl dispatch 'hl.dsp.dpms({ action = \"on\" })'";
         before_sleep_cmd = "loginctl lock-session";
+        # Hold off suspend until hyprlock has actually locked the session, so
+        # resume lands straight on a drawn lock screen instead of the desktop
+        # (or a console) while hyprlock is still starting.
+        inhibit_sleep = 3;
       };
 
       listener = [
