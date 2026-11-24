@@ -55,3 +55,8 @@ nixpkgs_locked pr:
 [group('check')]
 linux_firmware_has path:
     @.github/scripts/check-linux-firmware.py {{ quote(path) }}
+
+# Check: GitHub issue (owner/repo, number) is closed as completed
+[group('check')]
+github_issue_closed repo number:
+    @.github/scripts/check-github-issue.py {{ quote(repo) }} {{ quote(number) }}

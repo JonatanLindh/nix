@@ -37,8 +37,15 @@
   ];
 
   boot = {
-    # 7.3 + nvidia-open 615.78.08 breaks dGPU runtime D3 ("Not supported"); unpin once fixed
-    kernelPackages = pkgs.linuxPackages_7_2;
+    # Linux 7.3+ breaks nvidia-open dGPU runtime D3 ("Not supported"): kthreads
+    # now start in a nullfs root, so the driver's probe can't open the PCI
+    # sysfs config file. Pinned to the 6.18 LTS until the driver is fixed.
+    ##CHECK: github_issue_closed(NVIDIA/open-gpu-kernel-modules, 1507)
+    ## The fix must also be in the driver nixpkgs ships: compare the release
+    ## that fixed it with config.hardware.nvidia.package.version (hosts/xps/
+    ## nvidia.nix uses nvidiaPackages.latest). If it is, switch back to
+    ## pkgs.linuxPackages_latest and drop this comment; if not, report only.
+    kernelPackages = pkgs.linuxPackages_6_18;
 
     # WiFi speed is slow and crashes by default (https://bugzilla.kernel.org/show_bug.cgi?id=213381)
     # Tuning based on iwlwifi reference(https://wiki.archlinux.org/title/Network_configuration/Wireless#iwlwifi)
