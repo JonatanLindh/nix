@@ -44,7 +44,10 @@ const ACTIONS: [Action; 6] = [
         label: "Log out",
         icon: "logout",
         key: "e",
-        command: &["sh", "-c", r#"loginctl terminate-user "$USER""#],
+        // Ends the uwsm-managed session so the display manager's session process exits
+        // normally and the greeter comes back. `loginctl terminate-user` also killed SDDM's
+        // helper; SDDM took that as a crash and left a bare console.
+        command: &["uwsm", "stop"],
     },
     Action {
         label: "Shut down",
@@ -338,6 +341,9 @@ fn tile(model: &Entity<Session>, session: &Session, i: usize, action: &Action) -
         .width(Width::Px(TILE))
         .radius(18.)
         .padding(0.)
+        // Hovering selects the tile, which is the highlight; the button's own hover fill
+        // would fade the white selection to grey right after (a blink on every tile).
+        .hover(false)
         .rest(if current { theme::WHITE } else { theme::FILL });
     if usable {
         button = button.on_click(move |_, cx| run.update(cx, |s, cx| s.run(i, cx)));

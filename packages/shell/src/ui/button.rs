@@ -43,6 +43,7 @@ pub struct BarButton {
     on_middle: Option<Handler>,
     on_scroll: Option<ScrollHandler>,
     active: bool,
+    hover: bool,
     rest: Rgba,
     radius: f32,
     height: f32,
@@ -64,6 +65,7 @@ pub fn bar_button(id: impl Into<ElementId>, content: impl IntoElement) -> BarBut
         on_middle: None,
         on_scroll: None,
         active: false,
+        hover: true,
         rest: theme::TRANSPARENT,
         radius: theme::BUTTON_RADIUS,
         height: 26.,
@@ -107,6 +109,13 @@ impl BarButton {
     /// Keeps the highlight on, e.g. while this item's panel is open.
     pub fn active(mut self, active: bool) -> Self {
         self.active = active;
+        self
+    }
+
+    /// Off: no hover fill, for buttons whose owner shows hover itself (e.g. by selecting the
+    /// hovered one); the fill would cover that.
+    pub fn hover(mut self, hover: bool) -> Self {
+        self.hover = hover;
         self
     }
 
@@ -169,7 +178,7 @@ impl RenderOnce for BarButton {
         let interactive = self.interactive();
         // The hover background fades in and out rather than snapping.
         let hovered = window.use_keyed_state(self.id.clone(), cx, |_, _| false);
-        let target = if interactive && *hovered.read(cx) {
+        let target = if interactive && self.hover && *hovered.read(cx) {
             1.
         } else {
             0.
