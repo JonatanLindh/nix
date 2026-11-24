@@ -2,7 +2,9 @@ name: Update flake
 
 # Only ever triggered by the schedule or by someone with write access.
 # Do not add pull_request / issue_comment triggers: the repo is public and
-# this job has write access and a Claude credential.
+# this job has write access and a Claude credential. To continue an update PR
+# by hand, push to its branch (refresh-pr.yml rewrites the body) or mention
+# @claude in a comment (claude.yml, owner only).
 on:
   schedule:
     - cron: "0 4 * * 1" # Mondays 04:00 UTC
@@ -20,7 +22,8 @@ env:
   # Runs started from another branch get their own update branch and PR
   BRANCH: ${{ github.ref_name == 'main' && 'update-flake-lock' || format('update-flake-lock-{0}', github.ref_name) }}
   HAS_CLAUDE: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN != '' }}
-  # Evaluated before and after the update for the PR summary
+  # Evaluated before and after the update for the PR summary.
+  # Keep in sync with refresh-pr.yml
   VERSIONS_EXPR: |
     c: {
       "kernel (desktop)" = c.desktop.config.boot.kernelPackages.kernel.version;
@@ -267,106 +270,21 @@ jobs:
         if: steps.go.outputs.go == 'true'
         env:
           CHANGED: ${{ steps.update.outputs.changed }}
-          EVAL: ${{ steps.eval.outcome }}
           FIXED: ${{ steps.fix.outputs.fixed }}
           RESOLVED: ${{ steps.resolve.outputs.resolved }}
-          REEVAL: ${{ steps.reeval.outcome }}
           CHECKS: ${{ steps.checks.outcome }}
+          # The last evaluation is the one that counts
+          EVAL: ${{ (steps.fix.outputs.fixed == 'true' || steps.resolve.outputs.resolved == 'true') && steps.reeval.outcome || steps.eval.outcome }}
           WARNINGS: ${{ steps.reeval.outputs.warnings || steps.eval.outputs.warnings }}
         run: |
-          body="$RUNNER_TEMP/body.md"
-          # The last evaluation is the one that counts
-          final=$EVAL
-          if [ "$FIXED" = true ] || [ "$RESOLVED" = true ]; then
-            final=$REEVAL
-          fi
-          if [ "$final" = success ]; then
-            status="Both hosts evaluate."
-            ok=true
+          if [ "$CHANGED" = true ]; then
+            INTRO="Automated weekly \`nix flake update\`."
           else
-            status="**Evaluation fails.** Not safe to merge as is."
-            ok=false
+            INTRO="Automated weekly run. \`flake.lock\` is unchanged; this PR is for \`##CHECK:\` markers that became true."
           fi
-          if [ "$FIXED" = true ]; then
-            status="The update caused evaluation errors or warnings, and Claude changed the config in a separate commit. Review that commit before merging. $status"
-          fi
-          if [ "$RESOLVED" = true ]; then
-            status="$status Claude acted on passing \`##CHECK:\` markers in a separate commit; review that too."
-          fi
-          if [ "$ok" = true ] && [ "$WARNINGS" = true ]; then
-            status="$status There are still evaluation warnings; see the logs below."
-          fi
-          echo "ok=$ok" >> "$GITHUB_OUTPUT"
-
-          {
-            if [ "$CHANGED" = true ]; then
-              echo "Automated weekly \`nix flake update\`."
-            else
-              echo "Automated weekly run. \`flake.lock\` is unchanged; this PR is for \`##CHECK:\` markers that became true."
-            fi
-            echo
-            echo "$status"
-            echo
-            echo "Nothing was built, so build-time failures are not covered."
-            echo
-            echo "### Versions"
-            echo
-            # Rows whose version changed are bold
-            echo "| | before | after |"
-            echo "|---|---|---|"
-            jq -r -n --slurpfile b "$RUNNER_TEMP/before.json" --slurpfile a "$RUNNER_TEMP/after.json" '
-              ($b[0] + $a[0] | keys[]) as $k
-              | ($b[0][$k] // "?") as $old
-              | ($a[0][$k] // "?") as $new
-              | if $old != $new
-                then "| **\($k)** | \($old) | **\($new)** |"
-                else "| \($k) | \($old) | \($new) |"
-                end'
-            echo
-            echo "### Inputs"
-            echo
-            echo '```'
-            grep -v -E '^(warning|unpacking|copying|fetching)' "$RUNNER_TEMP/update.log" || true
-            echo '```'
-            if [ -s claude-summary.md ]; then
-              echo
-              echo "### Claude's summary"
-              echo
-              cat claude-summary.md
-            fi
-            echo
-            echo "### Checks"
-            echo
-            if [ "$CHECKS" != success ]; then
-              echo "**\`checks.py\` reported errors**; see the 'Evaluate checks' step."
-              echo
-            fi
-            # True, unknown and broken markers; false ones are the normal state
-            jq -r 'map(select(.result != "false"))
-                   | if length == 0 then "No `##CHECK:` marker is true."
-                     else .[] | "- **\(.error // .result)** `\(.file):\(.line)`: `\(.expr)`"
-                          + (if .result == "true" and .instructions == "" then " (no instructions; fix inferred)" else "" end)
-                     end' "$RUNNER_TEMP/checks.json" 2>/dev/null || echo "No check results."
-            if [ -s claude-checks-summary.md ]; then
-              echo
-              echo "#### What Claude did"
-              echo
-              cat claude-checks-summary.md
-            fi
-            # Logs are only worth showing when something is wrong
-            if [ "$ok" != true ] || [ "$WARNINGS" = true ]; then
-              for log in eval-*.log; do
-                [ -e "$log" ] || continue
-                echo
-                echo "### ${log%.log}"
-                echo
-                echo '```'
-                grep -v -E '^(copying path|unpacking) ' "$log" | tail -n 60
-                echo
-                echo '```'
-              done
-            fi
-          } > "$body"
+          INTRO=$INTRO BEFORE="$RUNNER_TEMP/before.json" AFTER="$RUNNER_TEMP/after.json" \
+            INPUTS="$RUNNER_TEMP/update.log" CHECKS_JSON="$RUNNER_TEMP/checks.json" \
+            .github/scripts/pr-body.sh "$RUNNER_TEMP/body.md"
 
       - name: Push branch and open PR
         if: steps.go.outputs.go == 'true'

@@ -1,0 +1,150 @@
+name: Refresh update PR
+
+# Rewrites the body of an open flake-update PR after someone pushes to its
+# branch (you, or Claude through claude.yml), so it matches the branch again.
+# Only people with write access can push here. The update workflow's own
+# pushes use GITHUB_TOKEN and so do not trigger this. Never pushes.
+on:
+  push:
+    branches:
+      - update-flake-lock
+      - update-flake-lock-*
+  workflow_dispatch: # run on the update branch to refresh by hand
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: refresh-pr-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  BRANCH: ${{ github.ref_name }}
+  # Keep in sync with update-flake.yml
+  VERSIONS_EXPR: |
+    c: {
+      "kernel (desktop)" = c.desktop.config.boot.kernelPackages.kernel.version;
+      "kernel (xps)" = c.xps.config.boot.kernelPackages.kernel.version;
+      "hyprland" = c.desktop.config.programs.hyprland.package.version;
+      "mesa" = c.desktop.pkgs.mesa.version;
+      "nvidia (xps)" = c.xps.config.hardware.nvidia.package.version;
+      "nixpkgs" = c.desktop.config.system.nixos.version;
+    }
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Find the open PR
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          pr=$(gh pr list -R "$REPO" --head "$BRANCH" --state open --json number,baseRefName \
+                 --jq '.[0] | select(.) | "\(.number) \(.baseRefName)"')
+          if [ -z "$pr" ]; then
+            echo "No open PR for $BRANCH"
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          {
+            echo "found=true"
+            echo "number=${pr% *}"
+            echo "base=${pr#* }"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v7
+        if: steps.pr.outputs.found == 'true'
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - uses: cachix/install-nix-action@v31
+        if: steps.pr.outputs.found == 'true'
+        with:
+          github_access_token: ${{ github.token }}
+
+      - name: Compare with the base branch
+        if: steps.pr.outputs.found == 'true'
+        env:
+          BASE: ${{ steps.pr.outputs.base }}
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ steps.pr.outputs.number }}
+        run: |
+          base=$(git merge-base "origin/$BASE" HEAD)
+          nix eval --json "git+file://$PWD?rev=$base#nixosConfigurations" --apply "$VERSIONS_EXPR" > "$RUNNER_TEMP/before.json" || echo '{}' > "$RUNNER_TEMP/before.json"
+          git show "$base:flake.lock" > "$RUNNER_TEMP/base.lock"
+          .github/scripts/lock-diff.py "$RUNNER_TEMP/base.lock" flake.lock > "$RUNNER_TEMP/inputs.txt"
+          {
+            echo "### Commits"
+            echo
+            git log --reverse --format='- %h %s (%an)' "$base..HEAD"
+            # Keep what Claude wrote during the update run; it explains the
+            # first commits. Taken from the PR body that workflow wrote.
+            gh pr view "$PR" --json body --jq .body \
+              | awk '/^### Claude.s summary/ { on = 1; print "### Claude'"'"'s summary from the update run"; next }
+                     on && /^### / { exit }
+                     on { print }'
+          } > "$RUNNER_TEMP/extra.md"
+
+      - name: Install just
+        if: steps.pr.outputs.found == 'true'
+        run: |
+          nix build nixpkgs#just --out-link "$RUNNER_TEMP/just"
+          echo "$RUNNER_TEMP/just/bin" >> "$GITHUB_PATH"
+
+      - name: Evaluate checks
+        id: checks
+        if: steps.pr.outputs.found == 'true'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: .github/scripts/checks.py --json > "$RUNNER_TEMP/checks.json"
+
+      - name: Evaluate hosts
+        id: eval
+        if: steps.pr.outputs.found == 'true'
+        continue-on-error: true
+        run: .github/scripts/eval-hosts.sh
+
+      - name: Versions after
+        if: steps.pr.outputs.found == 'true'
+        run: nix eval --json .#nixosConfigurations --apply "$VERSIONS_EXPR" > "$RUNNER_TEMP/after.json" || echo '{}' > "$RUNNER_TEMP/after.json"
+
+      - name: Write PR body
+        id: body
+        if: steps.pr.outputs.found == 'true'
+        env:
+          EVAL: ${{ steps.eval.outcome }}
+          WARNINGS: ${{ steps.eval.outputs.warnings }}
+          CHECKS: ${{ steps.checks.outcome }}
+          SHA: ${{ github.sha }}
+        run: |
+          INTRO="Automated \`nix flake update\`, refreshed after commits were pushed to the branch (now at ${SHA:0:12})." \
+            NOTE="Review every commit listed below." \
+            BEFORE="$RUNNER_TEMP/before.json" AFTER="$RUNNER_TEMP/after.json" \
+            INPUTS="$RUNNER_TEMP/inputs.txt" EXTRA="$RUNNER_TEMP/extra.md" \
+            CHECKS_JSON="$RUNNER_TEMP/checks.json" \
+            .github/scripts/pr-body.sh "$RUNNER_TEMP/body.md"
+
+      - name: Update PR
+        if: steps.pr.outputs.found == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ steps.pr.outputs.number }}
+          OK: ${{ steps.body.outputs.ok }}
+        run: |
+          gh pr edit -R "$REPO" "$PR" --body-file "$RUNNER_TEMP/body.md"
+          if [ "$OK" = true ]; then
+            gh pr ready -R "$REPO" "$PR" || true
+          else
+            gh pr ready -R "$REPO" "$PR" --undo || true
+          fi
+
+      - name: Report evaluation failure
+        if: steps.pr.outputs.found == 'true' && steps.eval.outcome != 'success'
+        run: exit 1

@@ -1,0 +1,85 @@
+name: Claude
+
+# Mention @claude in a PR or issue comment, or in a PR review, to have Claude
+# work on it (e.g. finish a flake-update PR the update workflow couldn't fix).
+#
+# The repo is public, so only the repo OWNER can trigger it: the job has
+# write access and a Claude credential. Keep that check in `if:` below,
+# and the fork check in the first step.
+#
+# Claude pushes with the Claude GitHub App's token (fetched through OIDC,
+# hence id-token: write), not GITHUB_TOKEN, so its pushes trigger Check and
+# refresh-pr.yml like yours do. Requires https://github.com/apps/claude to
+# be installed on this repo.
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+  pull_request_review:
+    types: [submitted]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  id-token: write
+
+concurrency:
+  group: claude-${{ github.event.issue.number || github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  claude:
+    if: >-
+      (github.event_name == 'pull_request_review'
+        && github.event.review.author_association == 'OWNER'
+        && contains(github.event.review.body, '@claude'))
+      || (github.event_name != 'pull_request_review'
+        && github.event.comment.author_association == 'OWNER'
+        && contains(github.event.comment.body, '@claude'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      # restrict_untrusted_prs is off below: PRs here are opened by bots
+      # (github-actions[bot] for flake updates), which the action can't
+      # confirm as trusted, so it would refuse to evaluate them. In exchange,
+      # Claude only runs on PRs whose branch lives in this repo, which only
+      # people with write access and this repo's workflows can push to.
+      # Never on fork PRs, whose code would run with this job's write access.
+      - name: Refuse fork PRs
+        if: github.event.issue.pull_request || github.event.pull_request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          NUM: ${{ github.event.issue.number || github.event.pull_request.number }}
+        run: |
+          cross=$(gh pr view "$NUM" -R "$REPO" --json isCrossRepository --jq .isCrossRepository)
+          if [ "$cross" != false ]; then
+            echo "::error::PR #$NUM is from a fork (or its origin is unknown); not running Claude on it"
+            exit 1
+          fi
+
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ github.token }}
+
+      - name: Install just
+        run: |
+          nix build nixpkgs#just --out-link "$RUNNER_TEMP/just"
+          echo "$RUNNER_TEMP/just/bin" >> "$GITHUB_PATH"
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # Safe only together with the "Refuse fork PRs" step above
+          restrict_untrusted_prs: "false"
+          claude_args: |
+            --max-turns 80
+            --add-dir /nix/store
+            --allowedTools "Read,Edit,Write,Glob,Grep,Bash(.github/scripts/eval-hosts.sh:*),Bash(./.github/scripts/eval-hosts.sh:*),Bash(just checks:*),Bash(just check:*),Bash(just recheck:*),Bash(just --list:*),Bash(nix eval:*),Bash(nix flake metadata:*),Bash(git diff:*),Bash(git status:*),Bash(git log:*),Bash(git show:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(grep:*),Bash(ls:*)"
+            --append-system-prompt "This is a NixOS + home-manager flake for two hosts (desktop, xps). You can only evaluate, not build: verify with .github/scripts/eval-hosts.sh or just check, and never claim something builds. Follow CLAUDE.md for ##CHECK: markers. Do not edit flake.lock unless asked, and never edit .github/workflows/."
