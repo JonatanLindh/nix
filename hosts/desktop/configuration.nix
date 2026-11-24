@@ -19,113 +19,9 @@
 
     overlays = [
       inputs.nix-vscode-extensions.overlays.default
-      (
-        pkgs': pkgs:
-        let
-          lib = pkgs'.lib;
-          llvmPkgs = pkgs'.llvmPackages_latest;
-        in
-        {
-          btop = pkgs.btop.override { rocmSupport = true; };
-          linuxPackages_zen_clang = pkgs.linuxPackages_zen.extend (
-            lp': lp: {
-              kernel = lp.kernel.override (old: {
-                stdenv = llvmPkgs.stdenv;
-
-                nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [
-                  # pkgs'.rustc
-                  # pkgs'.rust-bindgen
-                  # pkgs'.rustPlatform.rustLibSrc
-                  llvmPkgs.lld
-                  llvmPkgs.libclang
-                ];
-
-                extraMakeFlags = (old.extraMakeFlags or [ ]) ++ [
-                  "LLVM=1"
-                  "LLVM_IAS=1"
-
-                  "CC=${llvmPkgs.clang-unwrapped}/bin/clang"
-                  "LD=${llvmPkgs.lld}/bin/ld.lld"
-                  "HOSTCC=${llvmPkgs.clang}/bin/clang"
-                  "HOSTLD=${llvmPkgs.bintools}/bin/ld.lld"
-                  "HOSTLDFLAGS=--ld-path=${llvmPkgs.bintools}/bin/ld.lld"
-
-                  "AR=${llvmPkgs.llvm}/bin/llvm-ar"
-                  "NM=${llvmPkgs.llvm}/bin/llvm-nm"
-                  "OBJCOPY=${llvmPkgs.llvm}/bin/llvm-objcopy"
-                  "OBJDUMP=${llvmPkgs.llvm}/bin/llvm-objdump"
-                  "STRIP=${llvmPkgs.llvm}/bin/llvm-strip"
-                  "READELF=${llvmPkgs.llvm}/bin/llvm-readelf"
-
-                  "KCFLAGS+=-march=znver5"
-                  "KCFLAGS+=-mtune=znver5"
-                  "KCFLAGS+=-O2"
-                  "KCFLAGS+=-pipe"
-                  "KCFLAGS+=-Wframe-larger-than=4096"
-                ];
-
-                argsOverride = {
-                  structuredExtraConfig =
-                    with pkgs.lib.kernel;
-                    (old.structuredExtraConfig or { })
-                    // {
-                      # # LTO
-                      LTO_CLANG_THIN = yes;
-
-                      # # Scheduling & Preemption
-                      SCHED_AUTOGROUP = yes;
-
-                      # # 9950X3D
-                      AMD_3D_VCACHE = yes;
-
-                      # # Topology
-                      NR_CPUS = lib.mkForce (freeform "32");
-                    }
-                    // {
-                      # Disable unused
-
-                      # CPU & PLATFORM (Safe to disable Intel CPU features)
-                      CPU_SUP_INTEL = pkgs.lib.mkForce no;
-                      CPU_SUP_CENTAUR = pkgs.lib.mkForce no;
-                      CPU_SUP_ZHAOXIN = pkgs.lib.mkForce no;
-
-                      # Virtualization (Disable Intel VT-d, keep AMD-Vi)
-                      INTEL_IOMMU = pkgs.lib.mkForce no;
-
-                      # Disable Nvidia
-                      DRM_NOUVEAU = pkgs.lib.mkForce no;
-
-                      # Disable Intel Graphics
-                      DRM_I915 = pkgs.lib.mkForce no;
-                      DRM_XE = pkgs.lib.mkForce no;
-                      DRM_GMA500 = pkgs.lib.mkForce no;
-
-                      # Disable Legacy AMD (Pre-GCN)
-                      DRM_RADEON = pkgs.lib.mkForce no;
-                      DRM_AMDGPU_SI = pkgs.lib.mkForce no; # Southern Islands (HD 7000 series)
-                      DRM_AMDGPU_CIK = pkgs.lib.mkForce no; # Sea Islands (R9 200 series)
-
-                      # VM-guest-only display stubs (this box is a KVM host, never a guest)
-                      DRM_VIRTIO_GPU = pkgs.lib.mkForce no;
-                      DRM_QXL = pkgs.lib.mkForce no;
-                      DRM_VMWGFX = pkgs.lib.mkForce no;
-                      DRM_VBOXVIDEO = pkgs.lib.mkForce no;
-                      DRM_CIRRUS_QEMU = pkgs.lib.mkForce no;
-                      DRM_BOCHS = pkgs.lib.mkForce no;
-                      DRM_AST = pkgs.lib.mkForce no; # server BMC framebuffer
-                      DRM_MGAG200 = pkgs.lib.mkForce no; # server BMC framebuffer
-
-                      # AUDIO & USB
-                      USB4 = module;
-                    };
-                };
-
-                ignoreConfigErrors = true; # Rust + LTO currently not supported
-              });
-            }
-          );
-        }
-      )
+      (pkgs': pkgs: {
+        btop = pkgs.btop.override { rocmSupport = true; };
+      })
     ];
 
     config = {
@@ -135,8 +31,7 @@
   };
 
   boot = {
-    # kernelPackages = pkgs.linuxPackages_zen;
-    kernelPackages = pkgs.linuxPackages_zen_clang;
+    kernelPackages = pkgs.linuxPackages_zen;
 
     # # [NEW] Kernel Parameters for 9950X3D + 9070 XT
     kernelParams = [
