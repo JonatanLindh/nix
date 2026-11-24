@@ -33,6 +33,22 @@ in
   ];
 
   programs = {
+    # ~/.cargo/config.toml; cargo itself comes from rustup
+    cargo = {
+      enable = true;
+      package = null;
+      settings.build = {
+        # Intermediate artifacts per workspace under ~/.cargo/build instead of
+        # in each project's target/ (which keeps only final outputs). Not one
+        # shared dir: Cargo locks the whole build-dir, and `cargo clean` in
+        # one project would wipe it for all.
+        build-dir = "{cargo-cache-home}/build/{workspace-path-hash}";
+        # Shares compiled dependencies between projects; skips incremental
+        # (workspace) crates, which incremental compilation covers anyway
+        rustc-wrapper = lib.getExe pkgs.sccache;
+      };
+    };
+
     git = {
       enable = true;
 
