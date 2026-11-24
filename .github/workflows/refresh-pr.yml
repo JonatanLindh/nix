@@ -78,16 +78,33 @@ jobs:
           nix eval --json "git+file://$PWD?rev=$base#nixosConfigurations" --apply "$VERSIONS_EXPR" > "$RUNNER_TEMP/before.json" || echo '{}' > "$RUNNER_TEMP/before.json"
           git show "$base:flake.lock" > "$RUNNER_TEMP/base.lock"
           .github/scripts/lock-diff.py "$RUNNER_TEMP/base.lock" flake.lock > "$RUNNER_TEMP/inputs.txt"
+          # Keep what Claude wrote during the update run (it explains the first
+          # commits), collapsed, because later commits may have made parts of
+          # it untrue. Taken from the current PR body: between the markers
+          # once refreshed, else the "### Claude's summary" section.
+          gh pr view "$PR" --json body --jq .body | awk '
+            /^<!-- update-summary -->$/   { m = 1; next }
+            /^<!-- \/update-summary -->$/ { m = 0; next }
+            m { inner = inner $0 "\n"; next }
+            /^### Claude.s summary( from the update run)?$/ { h = 1; next }
+            h && /^### / { h = 0 }
+            h { head = head $0 "\n" }
+            END { printf "%s", (inner != "" ? inner : head) }' > "$RUNNER_TEMP/summary.md"
           {
             echo "### Commits"
             echo
             git log --reverse --format='- %h %s (%an)' "$base..HEAD"
-            # Keep what Claude wrote during the update run; it explains the
-            # first commits. Taken from the PR body that workflow wrote.
-            gh pr view "$PR" --json body --jq .body \
-              | awk '/^### Claude.s summary/ { on = 1; print "### Claude'"'"'s summary from the update run"; next }
-                     on && /^### / { exit }
-                     on { print }'
+            echo
+            if grep -q '[^[:space:]]' "$RUNNER_TEMP/summary.md"; then
+              echo "<details>"
+              echo "<summary>Claude's summary from the update run. Written before the commits after it, so parts may no longer be true.</summary>"
+              echo
+              echo "<!-- update-summary -->"
+              cat "$RUNNER_TEMP/summary.md"
+              echo "<!-- /update-summary -->"
+              echo
+              echo "</details>"
+            fi
           } > "$RUNNER_TEMP/extra.md"
 
       - name: Install just
